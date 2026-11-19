@@ -1,9 +1,24 @@
 import SwiftUI
 import DesignSystem
 
-/// App shell: current tab + custom bottom bar with the separate Duel action.
-/// Onboarding will be placed in front of this in stage 1.
+/// Shows onboarding on first launch, then the main tabs.
+///
+/// UI stage: completion is a local flag. Stage 1 replaces it with "registered profile exists".
+/// Reset in the simulator by launching with `-onboardingCompleted NO`.
 struct RootView: View {
+    @AppStorage("onboardingCompleted") private var onboardingCompleted = false
+
+    var body: some View {
+        if onboardingCompleted {
+            MainTabsView()
+        } else {
+            OnboardingFlowView(onFinish: { onboardingCompleted = true })
+        }
+    }
+}
+
+/// Main tabs + custom bottom bar with the separate Duel action.
+struct MainTabsView: View {
     @State private var selectedTab: AppTab = .home
     @State private var isDuelSetupPresented = false
 

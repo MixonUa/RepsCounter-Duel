@@ -13,13 +13,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		4D32CB8330ADEAC700AB5280 /* RepsCounterDuel.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "RepsCounterDuel.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D32CB8330ADEAC700AB5280 /* RepsCounterDuel.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RepsCounterDuel.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4D32CB8530ADEAC700AB5280 /* RepsCounterDuel */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "RepsCounterDuel";
+			path = RepsCounterDuel;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -72,13 +72,13 @@
 			fileSystemSynchronizedGroups = (
 				4D32CB8530ADEAC700AB5280 /* RepsCounterDuel */,
 			);
-			name = "RepsCounterDuel";
+			name = RepsCounterDuel;
 			packageProductDependencies = (
 				4D32CBA130ADEAC700AB5280 /* DesignSystem */,
 				4D32CBA230ADEAC700AB5280 /* ExerciseAnalyzer */,
 				4D32CBA330ADEAC700AB5280 /* Backend */,
 			);
-			productName = "RepsCounterDuel";
+			productName = RepsCounterDuel;
 			productReference = 4D32CB8330ADEAC700AB5280 /* RepsCounterDuel.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -274,6 +274,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -311,6 +312,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
