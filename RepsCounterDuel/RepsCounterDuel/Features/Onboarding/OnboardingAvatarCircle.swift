@@ -6,13 +6,15 @@ import DesignSystem
 struct OnboardingAvatarCircle: View {
     let emoji: String
     let diameter: CGFloat
+    /// Profile header uses a stronger blue (`RCColor.profileAvatarFill`).
+    var fill: Color = RCColor.avatarFillLarge
 
     var body: some View {
         Text(emoji)
             .font(.system(size: diameter * 0.715))
             .contentTransition(.opacity)
             .frame(width: diameter, height: diameter)
-            .background(RCColor.avatarFillLarge, in: Circle())
+            .background(fill, in: Circle())
             .shadow(color: .white.opacity(0.9), radius: diameter * 0.13)
             .accessibilityHidden(true)
     }

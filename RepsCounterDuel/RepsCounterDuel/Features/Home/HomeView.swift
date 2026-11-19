@@ -3,149 +3,266 @@ import Backend
 import DesignSystem
 import ExerciseAnalyzer
 
-/// Home tab. PROVISIONAL layout (Figma not inspected yet), mock data until stage 5.
+/// FIGMA Home. Two states from the same data:
+/// - empty (first launch): today's pill with "0", zero records + "Set a new record!",
+///   "Win your first duel" + "Challenge a Friend", rank card;
+/// - filled: weekly bars, records with weekly gains, last duel with "See all", rank card.
+/// Data is mock until stage 5 (DEBUG: `-debugDataState filled`).
 struct HomeView: View {
-    var stats: PlayerStats = MockData.myStats
-    var daily: [DailyDuelReps] = MockData.dailyDuelReps
-    var lastDuel: DuelSummary? = MockData.lastDuel
-    var ratingPlace: Int? = MockData.leaderboard(.global).first { $0.player == MockData.me }?.rank
+    let me: PlayerProfile
+    let overview: HomeOverview
     var onChallenge: () -> Void = {}
+    var onOpenRating: () -> Void = {}
+
+    private enum Sheet: String, Identifiable {
+        case training, duelHistory
+        var id: String { rawValue }
+    }
+
+    @State private var sheet: Sheet?
+    @State private var isSettingsPresented = false
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: RCSpacing.m) {
-                    statsCard
-                    chartCard
-                    trainingCard
-                    recentDuelCard
-                    ratingPlaceCard
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+
+                section("This week") { weekCard }
+                    .padding(.top, 57)
+
+                section("Your records") { recordsCard }
+                    .padding(.top, RCSpacing.xxl + RCSpacing.xxs)
+
+                if !overview.hasTrainingRecords {
+                    setRecordCard
+                        .padding(.top, RCSpacing.s)
                 }
-                .padding(.horizontal, RCSpacing.m)
-                .padding(.vertical, RCSpacing.xs)
+
+                section(
+                    "Recent duels",
+                    action: overview.lastDuel == nil ? nil : ("See all", { sheet = .duelHistory })
+                ) {
+                    if let lastDuel = overview.lastDuel {
+                        RecentDuelCard(me: me, duel: lastDuel)
+                    } else {
+                        firstDuelCard
+                    }
+                }
+                .padding(.top, RCSpacing.xxl + RCSpacing.xs)
+
+                if let rank = overview.rank {
+                    rankCard(rank)
+                        .padding(.top, RCSpacing.xxl)
+                }
             }
-            .background(RCColor.background)
-            .navigationTitle("Home")
+            .padding(.horizontal, RCSpacing.m)
+            .padding(.bottom, RCSpacing.l)
+        }
+        .scrollIndicators(.hidden)
+        .background(RCColor.background.ignoresSafeArea())
+        .fullScreenCover(isPresented: $isSettingsPresented) { SettingsView() }
+        .sheet(item: $sheet) { sheet in
+            switch sheet {
+            case .training:
+                PlaceholderSheet(title: "Training", message: "Training with the camera arrives in a later build.")
+            case .duelHistory:
+                PlaceholderSheet(title: "Recent duels", message: "Duel history arrives with the duel screens.")
+            }
         }
     }
 
-    private var statsCard: some View {
-        VStack(alignment: .leading, spacing: RCSpacing.s) {
-            RCSectionHeader("Statistics")
-            HStack {
-                RCStatTile(value: "\(stats.totalDuelReps)", label: "Duel reps")
-                RCStatTile(value: "\(stats.duelsWon)", label: "Wins")
-                RCStatTile(value: stats.winRate.map { $0.formatted(.percent.precision(.fractionLength(0))) } ?? "—", label: "Win rate")
-            }
-        }
-        .rcCard()
-    }
+    // MARK: - Header
 
-    private var chartCard: some View {
-        VStack(alignment: .leading, spacing: RCSpacing.s) {
-            RCSectionHeader("Duel reps per day")
-            DailyDuelRepsChart(data: daily)
-        }
-        .rcCard()
-    }
-
-    private var trainingCard: some View {
-        VStack(alignment: .leading, spacing: RCSpacing.s) {
-            RCSectionHeader("Training record")
-            HStack {
-                RCStatTile(value: "\(stats.trainingRecord(for: .pushUps))", label: "Push-ups")
-                RCStatTile(value: "\(stats.trainingRecord(for: .squats))", label: "Squats")
-            }
-            Button("Start training") {
-                // Training flow arrives in stage 3.
-            }
-            .buttonStyle(.rcPrimary)
-        }
-        .rcCard()
-    }
-
-    @ViewBuilder
-    private var recentDuelCard: some View {
-        VStack(alignment: .leading, spacing: RCSpacing.s) {
-            RCSectionHeader("Recent Duels")
-            if let lastDuel {
-                RecentDuelRow(duel: lastDuel)
-            } else {
-                Text("No duels yet")
-                    .foregroundStyle(RCColor.textSecondary)
-                Button("Challenge to a duel", action: onChallenge)
-                    .buttonStyle(.rcPrimary)
-            }
-        }
-        .rcCard()
-    }
-
-    private var ratingPlaceCard: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: RCSpacing.xxs) {
-                Text("Your place in the rating")
-                    .font(RCFont.statLabel)
-                    .foregroundStyle(RCColor.textSecondary)
-                Text(ratingPlace.map { "#\($0)" } ?? "—")
-                    .font(RCFont.statValue)
-            }
-            Spacer()
-            Image(systemName: "trophy.fill")
-                .font(.title)
-                .foregroundStyle(RCColor.accent)
-                .accessibilityHidden(true)
-        }
-        .accessibilityElement(children: .combine)
-        .rcCard()
-    }
-}
-
-private struct RecentDuelRow: View {
-    let duel: DuelSummary
-
-    var body: some View {
-        HStack(spacing: RCSpacing.s) {
-            RCEmojiAvatar(duel.opponent.emoji)
+    private var header: some View {
+        HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("vs \(duel.opponent.nickname)")
-                    .font(.headline)
-                Text("\(duel.exercise.displayName) · \(duel.duration.displayName)")
-                    .font(RCFont.caption)
-                    .foregroundStyle(RCColor.textSecondary)
+                Text("Hello, \(me.nickname)! 👋")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(RCColor.accent)
+                Text("Reps Counter")
+                    .font(RCFont.homeTitle)
+                    .foregroundStyle(RCColor.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("\(duel.myReps) : \(duel.opponentReps)")
-                    .font(.headline.monospacedDigit())
-                Text(outcomeTitle)
-                    .font(RCFont.caption.weight(.semibold))
-                    .foregroundStyle(outcomeColor)
+            Button { isSettingsPresented = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(RCColor.textPrimary)
+                    .frame(width: RCSize.backButton, height: RCSize.backButton)
+                    .contentShape(Circle())
             }
+            .buttonStyle(.plain)
+            .rcGlass(in: Circle(), interactive: true)
+            .accessibilityLabel("Settings")
         }
-        .accessibilityElement(children: .combine)
+        .padding(.top, RCSpacing.xs)
     }
 
-    private var outcomeTitle: String {
-        switch duel.outcome {
-        case .win: "Win"
-        case .loss: "Loss"
-        case .draw: "Draw"
+    // MARK: - Sections
+
+    private func section<Content: View>(
+        _ title: String,
+        action: (String, () -> Void)? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: RCSpacing.s) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(RCFont.homeHeading)
+                    .tracking(-0.8)
+                    .foregroundStyle(RCColor.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                if let action {
+                    Button(action.0, action: action.1)
+                        .font(.system(size: 17))
+                        .foregroundStyle(RCColor.accent)
+                }
+            }
+            content()
         }
     }
 
-    private var outcomeColor: Color {
-        switch duel.outcome {
-        case .win: RCColor.win
-        case .loss: RCColor.loss
-        case .draw: RCColor.draw
-        }
-    }
-}
+    private var weekCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(overview.week.total)")
+                    .font(.system(size: 28, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(RCColor.textPrimary)
+                Text("Reps")
+                    .font(.system(size: 15))
+                    .foregroundStyle(RCColor.textSecondary)
+            }
+            Text(WeekRangeFormatter.string(from: overview.week.start, to: overview.week.end))
+                .font(.system(size: 12))
+                .foregroundStyle(RCColor.textSecondary)
+                .padding(.top, 4)
 
-#Preview("With data") {
-    HomeView()
+            WeeklyRepsChart(week: overview.week)
+                .padding(.horizontal, -RCSpacing.l)
+                .padding(.top, RCSpacing.s + 1)
+        }
+        .padding(.horizontal, RCSpacing.l + 2)
+        .padding(.top, RCSpacing.m)
+        .padding(.bottom, RCSpacing.s + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: RCRadius.card, style: .continuous))
+    }
+
+    private var recordsCard: some View {
+        RecordsCard(items: [
+            .init(
+                systemImage: "figure.run",
+                value: "\(overview.trainingRecords[.pushUps] ?? 0)",
+                label: "Push-ups",
+                weeklyChange: gainText(.pushUps)
+            ),
+            .init(
+                systemImage: "figure.step.training",
+                value: "\(overview.trainingRecords[.squats] ?? 0)",
+                label: "Squats",
+                weeklyChange: gainText(.squats)
+            ),
+        ])
+    }
+
+    private func gainText(_ exercise: Exercise) -> String? {
+        guard let gain = overview.trainingRecordGains[exercise], gain > 0 else { return nil }
+        return "+\(gain) this week"
+    }
+
+    // MARK: - Empty-state cards
+
+    private var setRecordCard: some View {
+        callToActionCard(
+            title: "Set a new record !",
+            subtitle: "Start a train to set a reps record",
+            button: "Start Train",
+            action: { sheet = .training }
+        )
+    }
+
+    private var firstDuelCard: some View {
+        callToActionCard(
+            title: "Win your first duel",
+            subtitle: "Compete with friends and track duel history",
+            button: "Challenge a Friend",
+            action: onChallenge
+        )
+    }
+
+    private func callToActionCard(title: String, subtitle: String, button: String, action: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .tracking(-0.6)
+                .foregroundStyle(RCColor.textPrimary)
+            Text(subtitle)
+                .font(.system(size: 13))
+                .foregroundStyle(RCColor.textSecondary)
+                .padding(.top, RCSpacing.xxs)
+            Button(button, action: action)
+                .buttonStyle(.rcPrimary)
+                .padding(.horizontal, -RCSpacing.xxs)
+                .padding(.top, RCSpacing.s + 1)
+        }
+        .padding(.horizontal, RCSpacing.l)
+        .padding(.top, RCSpacing.s + 2)
+        .padding(.bottom, RCSpacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: RCRadius.card, style: .continuous))
+    }
+
+    // MARK: - Rank
+
+    /// FIGMA: weekly place; the whole card opens the Rating tab.
+    private func rankCard(_ rank: WeeklyRank) -> some View {
+        Button(action: onOpenRating) {
+            HStack(spacing: RCSpacing.m) {
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(RCColor.accent)
+                    .frame(width: 48, height: 48)
+                    .background(RCColor.rankTile, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("You're #\(rank.position) this week")
+                        .font(.system(size: 17, weight: .semibold))
+                        .tracking(-0.6)
+                        .foregroundStyle(RCColor.textPrimary)
+                    Text(rankSubtitle(rank))
+                        .font(.system(size: 14))
+                        .tracking(-0.3)
+                        .foregroundStyle(RCColor.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: RCSpacing.xs)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(RCColor.textSecondary)
+            }
+            .padding(.horizontal, RCSpacing.m)
+            .frame(maxWidth: .infinity, minHeight: 80)
+            .background(.white, in: RoundedRectangle(cornerRadius: RCRadius.card, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: RCRadius.card, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func rankSubtitle(_ rank: WeeklyRank) -> String {
+        if let milestone = rank.milestone, let reps = rank.repsToNextMilestone {
+            return "\(reps) more reps to break into the top \(milestone)"
+        }
+        return "You're at the top of the rating!"
+    }
 }
 
 #Preview("Empty") {
-    HomeView(stats: .empty, daily: [], lastDuel: nil, ratingPlace: nil)
+    HomeView(me: PlayerProfile(nickname: "Nova_07", emoji: "🐧"), overview: MockData.homeEmpty())
+}
+
+#Preview("Filled") {
+    HomeView(me: PlayerProfile(nickname: "Nova_07", emoji: "🐧"), overview: MockData.homeFilled())
 }

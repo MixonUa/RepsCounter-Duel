@@ -15,46 +15,48 @@ public struct RCTabBarItem<Tab: Hashable>: Identifiable {
     }
 }
 
-/// Custom bottom bar: a capsule with the main tabs plus a visually separate
-/// round action button on the right (the Duel action). PROVISIONAL layout until checked against Figma.
+/// FIGMA bottom bar: a capsule with the main tabs (gray pill behind the selected one, accent icon
+/// and label) plus a separate round accent "VS" button on the right (the Duel action).
 public struct RCTabBar<Tab: Hashable>: View {
     private let items: [RCTabBarItem<Tab>]
     @Binding private var selection: Tab
-    private let actionTitle: String
-    private let actionSystemImage: String
+    private let actionText: String
+    private let actionAccessibilityLabel: String
     private let action: () -> Void
 
     public init(
         items: [RCTabBarItem<Tab>],
         selection: Binding<Tab>,
-        actionTitle: String,
-        actionSystemImage: String,
+        actionText: String,
+        actionAccessibilityLabel: String,
         action: @escaping () -> Void
     ) {
         self.items = items
         self._selection = selection
-        self.actionTitle = actionTitle
-        self.actionSystemImage = actionSystemImage
+        self.actionText = actionText
+        self.actionAccessibilityLabel = actionAccessibilityLabel
         self.action = action
     }
 
     public var body: some View {
-        HStack(spacing: RCSpacing.s) {
+        HStack(spacing: RCSpacing.xs) {
             tabs
             actionButton
         }
-        .padding(.horizontal, RCSpacing.m)
+        .padding(.horizontal, RCSpacing.l)
         .padding(.bottom, RCSpacing.xxs)
     }
 
+    /// FIGMA: 66 pt capsule; tabs are 73 pt pills (inset 7 pt), the outer ones at the edges.
     private var tabs: some View {
         HStack(spacing: 0) {
-            ForEach(items) { item in
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { Spacer(minLength: RCSpacing.xxs) }
                 tabButton(item)
             }
         }
-        .padding(.horizontal, RCSpacing.xxs)
-        .frame(height: RCSize.tabBarHeight)
+        .padding(7)
+        .frame(height: 66)
         .rcGlass(in: Capsule())
     }
 
@@ -63,36 +65,41 @@ public struct RCTabBar<Tab: Hashable>: View {
         return Button {
             selection = item.tab
         } label: {
-            VStack(spacing: 2) {
+            VStack(spacing: 3) {
                 Image(systemName: item.systemImage)
-                    .font(.system(size: 20, weight: .semibold))
-                    .symbolVariant(isSelected ? .fill : .none)
+                    .font(.system(size: 21, weight: .semibold))
+                    .frame(height: 24)
                 Text(item.title)
-                    .font(.caption2.weight(.medium))
+                    .font(.system(size: 12, weight: .semibold))
             }
-            .foregroundStyle(isSelected ? RCColor.accent : RCColor.textSecondary)
-            .frame(maxWidth: .infinity, minHeight: RCSize.minTouchTarget)
-            .contentShape(Rectangle())
+            .foregroundStyle(isSelected ? RCColor.accent : RCColor.textPrimary)
+            .frame(width: 73)
+            .frame(maxHeight: .infinity)
+            .background {
+                if isSelected {
+                    Capsule().fill(RCColor.tabSelectedPill)
+                }
+            }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .animation(.snappy, value: isSelected)
         .accessibilityLabel(item.title)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
+    /// FIGMA: 62 pt accent circle with heavy italic "VS" and a soft accent glow.
     private var actionButton: some View {
         Button(action: action) {
-            VStack(spacing: 2) {
-                Image(systemName: actionSystemImage)
-                    .font(.system(size: 22, weight: .bold))
-                Text(actionTitle)
-                    .font(.caption2.weight(.semibold))
-            }
-            .foregroundStyle(.white)
-            .frame(width: RCSize.tabBarHeight, height: RCSize.tabBarHeight)
-            .contentShape(Circle())
+            Text(actionText)
+                .font(.system(size: 27, weight: .black).italic())
+                .foregroundStyle(.white)
+                .frame(width: 62, height: 62)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .rcProminentGlass(in: Circle())
-        .accessibilityLabel(actionTitle)
+        .shadow(color: RCColor.accent.opacity(0.35), radius: 12, y: 4)
+        .accessibilityLabel(actionAccessibilityLabel)
     }
 }

@@ -26,7 +26,8 @@ public enum RCSize {
     public static let tabBarHeight: CGFloat = 64
     /// FIGMA: large primary button height.
     public static let buttonLarge: CGFloat = 64
-    public static let button: CGFloat = 52
+    /// FIGMA Home: primary button inside a card.
+    public static let button: CGFloat = 50
     /// FIGMA: capsule text field height.
     public static let field: CGFloat = 57
     /// FIGMA: round back button.
@@ -80,6 +81,44 @@ public enum RCColor {
     /// FIGMA: large bolt illustration gradient, top → bottom.
     public static let boltTop = Color(rgb: 0x56C1FA)
     public static let boltBottom = Color(rgb: 0x0E65EE)
+    /// FIGMA Home chart: past-day bar, empty-day pill.
+    public static let chartPastBar = Color(rgb: 0xBEDDFE)
+    public static let chartEmptyPill = Color(rgb: 0xEFEFEF)
+    /// FIGMA Home rank card: light-blue tile behind the trophy.
+    public static let rankTile = Color(rgb: 0xDEEEFF)
+    /// FIGMA tab bar: pill behind the selected tab.
+    public static let tabSelectedPill = Color(rgb: 0xDEDEE2)
+    /// FIGMA Profile header gradient (top → deepest blue; fades into `background`).
+    public static let profileHeaderTop = Color(rgb: 0x278BFB)
+    public static let profileHeaderDeep = Color(rgb: 0x157EF5)
+    /// FIGMA Profile: avatar circle on the blue header.
+    public static let profileAvatarFill = Color(rgb: 0x8DC1FB)
+    /// FIGMA Top Friends rank numbers and pending-request gray.
+    public static let rankNumber = Color(rgb: 0xC2C2C4)
+    public static let pendingFill = Color(rgb: 0xEBEBEB)
+    /// FIGMA Friends: light-blue avatar circle.
+    public static let friendAvatarFill = Color(rgb: 0xDDEEFF)
+    /// FIGMA Settings: deep-navy PRO card with a diagonal light streak.
+    public static let proCardBase = Color(rgb: 0x012186)
+    public static let proCardEdge = Color(rgb: 0x01114B)
+    public static let proCardStreak = Color(rgb: 0x0D53E1)
+    /// FIGMA Settings: grouped rows card, section titles, segmented control track, row arrows.
+    public static let settingsGroup = Color(rgb: 0xF7F6F9)
+    public static let sectionTitle = Color(rgb: 0x88878E)
+    public static let segmentTrack = Color(rgb: 0xE8E7EA)
+    public static let rowArrow = Color(rgb: 0xC4C3C6)
+    /// FIGMA friend request: light pink "Reject" capsule (text uses `error`).
+    public static let rejectFill = Color(rgb: 0xFADDE1)
+    /// FIGMA Rating: podium card fill, avatar circle, place-number gradient, list card, my row,
+    /// empty-state skeletons.
+    public static let podiumCard = Color(rgb: 0xEFF4FD)
+    public static let podiumAvatar = Color(rgb: 0xB2D2FB)
+    public static let placeNumberTop = Color(rgb: 0x68B1FF)
+    public static let placeNumberBottom = Color(rgb: 0x9FCBFE)
+    public static let leaderboardCard = Color(rgb: 0xF9F9FB)
+    public static let myRow = Color(rgb: 0xB0CFF2)
+    public static let skeleton = Color(rgb: 0xC7C7C9)
+    public static let skeletonBar = Color(rgb: 0xDBDADD)
     /// FIGMA: "Win" / "+4 this week" green.
     public static let win = Color(rgb: 0x36BF5A)
     public static let loss = Color.red
@@ -104,6 +143,10 @@ public enum RCFont {
     public static let tip = Font.callout.weight(.semibold)
     /// FIGMA: section heading above a card ("Your records", "Recent duels").
     public static let cardHeading = Font.system(size: 23, weight: .bold)
+    /// FIGMA Home: section heading ("This week", "Your records"); used with tracking -0.8.
+    public static let homeHeading = Font.system(size: 20, weight: .bold)
+    /// FIGMA Home: screen title "Reps Counter".
+    public static let homeTitle = Font.system(size: 34, weight: .bold)
     /// FIGMA: large primary button label.
     public static let buttonLarge = Font.title2.weight(.semibold)
     /// Distance-readable live counter for training / duel screens.

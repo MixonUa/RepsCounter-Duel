@@ -1,12 +1,12 @@
 import SwiftUI
 import DesignSystem
 
-/// FIGMA "Your records" card: two columns (icon, big number, label, weekly change) split by a
-/// thin divider. Used on the onboarding explanation slide; meant for reuse on Home.
+/// FIGMA stat card: columns (icon, big value, label, optional weekly change) split by thin
+/// dividers. "Your records" (onboarding, Home) and the Profile stats card.
 struct RecordsCard: View {
     struct Item: Identifiable {
         let systemImage: String
-        let value: Int
+        let value: String
         let label: String
         /// e.g. "+4 this week"; nil hides the line.
         let weeklyChange: String?
@@ -39,7 +39,7 @@ struct RecordsCard: View {
                 // Fixed height so columns line up whatever the symbol's proportions.
                 .frame(height: 22)
                 .padding(.bottom, 2)
-            Text("\(item.value)")
+            Text(item.value)
                 .font(.system(size: 28, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(RCColor.textPrimary)

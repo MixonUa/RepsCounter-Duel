@@ -30,8 +30,8 @@ struct TrainOrChallengeStepView: View {
 
             section("Your records") {
                 RecordsCard(items: [
-                    .init(systemImage: "figure.run", value: 74, label: "Push-ups", weeklyChange: "+4 this week"),
-                    .init(systemImage: "figure.step.training", value: 82, label: "Squats", weeklyChange: "+2 this week"),
+                    .init(systemImage: "figure.run", value: "74", label: "Push-ups", weeklyChange: "+4 this week"),
+                    .init(systemImage: "figure.step.training", value: "82", label: "Squats", weeklyChange: "+2 this week"),
                 ])
             }
 

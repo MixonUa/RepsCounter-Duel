@@ -3,7 +3,7 @@
 > Живая карта проекта: что реализовано, как и где лежит. Обновляется вместе с кодом (правила — в `CLAUDE.md`, раздел 10).
 > Статусы: ✅ реализовано · 🚧 в работе · 📋 запланировано (ещё нет в коде)
 
-**Последнее обновление:** 2026-11-19 — «Этап UI», шаг 1: онбординг — вводные слайды 1–2, экран ника (с ошибкой «ник занят»), выбор аватара, «Your Profile Is Ready!», весь онбординг по макету Figma: слайды, ник, аватар, профиль, цель, слайды-объяснения, пейвол и запрос камеры (с экраном «доступ запрещён» и Open Settings); онбординг продолжается с места остановки после перезапуска; прогресс-бар и кнопка «назад»; токены цвета и кнопки сняты с макета; приложение закреплено в светлой теме.
+**Последнее обновление:** 2026-11-19 — «Этап UI», шаг 4: экран Rating по макету (пустое и заполненное состояния, подиум топ-3, Global / Friends, своя строка закреплена над таббаром, пока не доскроллили до неё); тестовая кнопка Invite убрана с Home. Шаг 3: Profile, список Friends, Settings, Add a Friend, карточка игрока и входящая заявка в друзья (по макету), Edit Profile (свой дизайн: смена аватара и ника); рейтинг недельный. Шаг 2: Home по макету (пустое и заполненное состояния, недельный график, новый таббар с кнопкой VS). Шаг 1: онбординг — вводные слайды 1–2, экран ника (с ошибкой «ник занят»), выбор аватара, «Your Profile Is Ready!», весь онбординг по макету Figma: слайды, ник, аватар, профиль, цель, слайды-объяснения, пейвол и запрос камеры (с экраном «доступ запрещён» и Open Settings); онбординг продолжается с места остановки после перезапуска; прогресс-бар и кнопка «назад»; токены цвета и кнопки сняты с макета; приложение закреплено в светлой теме.
 
 **Дизайн:** [Figma — Vibecode-test](https://www.figma.com/design/sdECikkyovjvnloQ6SqFqo/Vibecode-test) (источник истины для экранов). Доступа через Figma MCP пока нет. Экраны верстаются по PNG-экспортам фреймов: значения, снятые с макета, помечены в коде `FIGMA`, придуманные — `PROVISIONAL`.
 
@@ -28,25 +28,27 @@ RepsCounter-Duel/                      # корень git-репозитория
 │       │   │   ├── Tokens.swift       # ✅ отступы, радиусы, цвета, шрифты; градиентный фон экранов (часть значений с макета)
 │       │   │   ├── Glass.swift        # ✅ rcGlass / rcProminentGlass: Liquid Glass на iOS 26+, материал на iOS 18–25
 │       │   │   ├── Card.swift         # ✅ карточка, заголовок секции, плитка статистики, эмодзи-аватар
-│       │   │   ├── Buttons.swift      # ✅ кнопки: .rcPrimaryLarge (64 pt, градиент; неактивная — серая) / .rcPrimary / .rcSecondary
+│       │   │   ├── Buttons.swift      # ✅ кнопки: .rcPrimaryLarge (64) / .rcPrimary (50) / .rcPrimaryCompact (48) — градиент, неактивная серая; .rcDestructive(Large) — розовая «Reject»; .rcSecondary
+│       │   │   ├── RCSegmentedToggle.swift    # ✅ переключатель из двух вариантов (On/Off, Mon/Sun) как в Settings
 │       │   │   ├── RCPageIndicator.swift      # ✅ точки страниц (активная — синяя капсула)
 │       │   │   ├── RCViewfinderCorners.swift  # ✅ уголки «видоискателя» вокруг картинки / превью камеры
 │       │   │   ├── RCProgressBar.swift    # ✅ тонкий прогресс-бар онбординга (128 × 6 pt)
 │       │   │   ├── RCBackButton.swift     # ✅ круглая стеклянная кнопка «назад»
 │       │   │   ├── RCTextField.swift      # ✅ .rcCapsuleField() — белое поле-капсула 57 pt
-│       │   │   └── RCTabBar.swift     # ✅ нижняя панель: капсула с табами + отдельная круглая кнопка справа
+│       │   │   └── RCTabBar.swift     # ✅ нижняя панель по макету: капсула с табами (серая «пилюля» под выбранным) + круглая синяя кнопка «VS»
 │       │   ├── ExerciseAnalyzer/
 │       │   │   └── Exercise.swift     # ✅ упражнения: squats, push-ups (машины состояний — этап 3)
 │       │   └── Backend/
-│       │       ├── Models/            # ✅ PlayerProfile, PlayerStats (рекорды тренировок по упражнению + их сумма), DailyDuelReps, DuelDuration, DuelSummary, LeaderboardEntry
+│       │       ├── Models/            # ✅ Friends (FriendListItem, TopFriend, ProfileOverview), PlayerProfile, PlayerStats (рекорды тренировок по упражнению + их сумма), DailyDuelReps, DuelDuration, DuelSummary, LeaderboardEntry, HomeOverview (неделя Пн–Вс `WeekSummary`, недельное место `WeeklyRank` с «топ N»), RatingOverview (недельный рейтинг Global + Friends)
+│       │       ├── FriendsService.swift       # ✅ `PlayerCard` и протокол поиска игрока / отправки и ответа на заявку в друзья + тестовый сервис (находятся Theo_9, Max_Power, Mila_K, NewPlayer; `offline` — нет сети)
 │       │       ├── ProfileRegistration.swift  # ✅ протокол регистрации профиля + тестовый сервис (admin → «занят», offline → нет сети)
 │       │       ├── NicknameAvailability.swift # ✅ протокол проверки ника + NicknameRules + тестовый сервис (занят только admin; `offline` — имитация нет сети)
 │       │       ├── LeaderboardRanking.swift   # ✅ сортировка рейтинга: равные суммы — одно место, стабильная вторичная сортировка
 │       │       ├── BackendConfiguration.swift # ✅ URL проекта + anon key → SupabaseClient (проект ещё не создан)
-│       │       └── MockData.swift     # ✅ тестовые данные для превью и каркаса (не реальные пользователи)
+│       │       └── MockData.swift     # ✅ тестовые данные для превью и каркаса (не реальные пользователи), `homeEmpty` / `homeFilled` для Home, `profileEmpty` / `profileFilled` для Profile
 │       └── Tests/
 │           ├── ExerciseAnalyzerTests/ # ✅ тесты Exercise
-│           └── BackendTests/          # ✅ тесты рейтинга (ничьи, детерминизм), исхода дуэли и проверки ника
+│           └── BackendTests/          # ✅ тесты рейтинга (ничьи, детерминизм), исхода дуэли, проверки ника, недели Пн–Вс и «топ N»
 └── RepsCounterDuel/                   # папка Xcode-проекта
     ├── RepsCounterDuel.xcodeproj      # ✅ проект Xcode; подключает локальный пакет (../Packages/RepsCounterKit)
     │   ├── project.xcworkspace/xcshareddata/swiftpm/Package.resolved  # ✅ версии пакетов для Xcode
@@ -55,12 +57,17 @@ RepsCounter-Duel/                      # корень git-репозитория
     └── RepsCounterDuel/               # ✅ исходники приложения (синхронизируемая папка: новые файлы подхватываются автоматически)
         ├── App/
         │   ├── RepsCounter_DuelApp.swift  # ✅ точка входа (@main), показывает RootView
+        │   ├── LocalStorageKeys.swift # ✅ ключи UserDefaults (ник/эмодзи, шаг онбординга, настройки) и ссылки `AppLinks` (почта поддержки и App Store — пока nil)
         │   ├── AppTab.swift           # ✅ табы Home / Rating / Profile (Duel — не таб, а отдельная кнопка)
-        │   └── RootView.swift         # ✅ RootView: онбординг до завершения, затем MainTabsView (текущий таб + RCTabBar, кнопка Duel → настройка дуэли)
+        │   └── RootView.swift         # ✅ RootView: онбординг до завершения, затем MainTabsView (текущий таб + плавающий RCTabBar в 22 pt от края экрана, кнопка VS → настройка дуэли); ник/эмодзи — из сохранённой регистрации (DEBUG: `-debugDataState filled` — заполненные Home и Profile)
         ├── Services/
         │   └── CameraPermission.swift # ✅ статус и запрос доступа к камере (AVFoundation); часть будущего CameraService
         ├── Shared/Components/
-        │   ├── RecordsCard.swift      # ✅ карточка «Your records»: две колонки (иконка, число, подпись, «+N this week»), для онбординга и Home
+        │   ├── TabBarVisibility.swift # ✅ `.hidesTabBar()` — экраны без таббара по макету (Friends)
+        │   ├── PlayerHeader.swift     # ✅ синяя шапка игрока (аватар, ник + копирование, «Top N», кнопки по бокам) — Profile и карточка игрока
+        │   ├── AvatarGrid.swift       # ✅ сетка эмодзи 3 в ряд (онбординг и Edit Profile)
+        │   ├── PlaceholderSheet.swift # 🚧 временный лист для ещё не нарисованных экранов (Settings, тренировка, история дуэлей)
+        │   ├── RecordsCard.swift      # ✅ карточка-статистика: колонки (иконка, значение, подпись, «+N this week») — «Your records» и статистика Profile
         │   └── RecentDuelCard.swift   # ✅ карточка «Recent duels»: я (кольцо + ⚡) — счёт, исход, упражнение — соперник, для онбординга и Home
         ├── Features/
         │   ├── Onboarding/
@@ -83,21 +90,31 @@ RepsCounter-Duel/                      # корень git-репозитория
         │   │   ├── IntroPagerView.swift   # ✅ листание слайдов + точки + Continue (DEBUG: `-debugIntroPage N`)
         │   │   └── OnboardingPlaceholderStepView.swift  # 🚧 временный экран-заглушка (сейчас не используется в потоке)
         │   ├── Paywall/
-        │   │   ├── PaywallContent.swift   # ✅ содержимое пейвола (тексты, картинка, кнопка); `.onboardingTrial` — пейвол онбординга (цена пока текстом, PROVISIONAL)
-        │   │   ├── PaywallView.swift      # ✅ общий макет пейвола: ✕, заголовок, картинка, «✅ …», описание, кнопка, ссылки Terms · Privacy · Restore
+        │   │   ├── PaywallContent.swift   # ✅ содержимое пейвола (тексты, картинка, планы `PaywallPlan`, порядок заголовка); `.onboardingTrial` — онбординг, `.goPro` — Go PRO из Settings (цены пока текстом, PROVISIONAL)
+        │   │   ├── PaywallView.swift      # ✅ общий макет пейвола: ✕, заголовок над или под картинкой, карточки планов с выбором и бейджем, «✅ …», описание, кнопка, ссылки Terms · Privacy · Restore
         │   │   ├── PaywallPurchasing.swift # ✅ протокол покупки / восстановления + тестовый сервис (покупка удаётся, восстанавливать нечего); StoreKit — позже
         │   │   ├── LegalDocumentView.swift # 🚧 временный экран Terms of Use / Privacy Policy (документов ещё нет)
-        │   │   └── OnboardingPaywallStepView.swift # ✅ пейвол в онбординге: ✕ или покупка → дальше, ссылки и Restore работают
+        │   │   └── PaywallFlowView.swift  # ✅ пейвол с поведением: ✕ или покупка → `onDone`, ссылки и Restore работают (онбординг и Go PRO из Settings)
         │   ├── Home/
-        │   │   ├── HomeView.swift     # ✅ статистика, график, рекорд + Start training, Recent Duels / Challenge, место в рейтинге (тестовые данные)
-        │   │   └── DailyDuelRepsChart.swift  # ✅ столбчатый график «день → повторения в дуэлях» (Swift Charts)
+        │   │   ├── HomeView.swift     # ✅ Home по макету: приветствие + Settings, This week, Your records, Set a new record / Start Train, Recent duels / Challenge a Friend, недельное место → Rating (тестовые данные)
+        │   │   └── WeeklyRepsChart.swift  # ✅ недельный график Пн–Вс: значения в ряд над столбцами, прошедшие дни голубые, сегодня синий, пустые/будущие — серые «пилюли»
         │   ├── Rating/
-        │   │   └── RatingView.swift   # ✅ переключатель Global / Friends, одна общая сумма (тестовые данные)
+        │   │   ├── RatingView.swift   # ✅ Rating по макету: заголовок + чип «моё место + аватар», подиум, подпись (своя для пустого Global / Friends), переключатель Global / Friends, полный список с 1-го места (на макете с 4-го — ошибка дизайна; в пустом — серые заглушки), своя строка подсвечена и закреплена снизу, пока её не видно (onScrollVisibilityChange)
+        │   │   └── RatingPodium.swift # ✅ подиум 2 · 1 · 3 (карточки, аватар «?» для пустого места, номер места с градиентом) и фон RatingRaysBackground (картинка `RatingRays` из Assets)
         │   ├── Profile/
-        │   │   └── ProfileView.swift  # ✅ эмодзи, ник, компактная статистика, топ-3 друзей, See all / Add friend (кнопки пока пустые)
+        │   │   ├── ProfileView.swift  # ✅ Profile по макету: синяя шапка, Edit/Settings, ник + копирование, «Top N», статистика, Top Friends недели → see all; пустое состояние — «No friends yet» (временно)
+        │   │   └── EditProfileView.swift  # 🚧 свой дизайн (макета нет): тап по аватару → сетка эмодзи, карандаш у ника → свой алерт смены ника с проверкой как в онбординге; сохраняется локально
+        │   ├── Settings/
+        │   │   └── SettingsView.swift # ✅ Settings по макету: карточка PRO → пейвол Go PRO, Rep sound, First day of the week (Пн/Вс для графика Home), Rate the app, Share, Contact us (заглушка без почты), Privacy, Terms
+        │   ├── Friends/
+        │   │   ├── FriendsListView.swift  # ✅ «Friends»: друзья с недельным местом (→ карточка игрока), «Request Sent», «Add New Friend»; без таббара; режим «только чтение» для друзей другого игрока
+        │   │   ├── AddFriendSheet.swift   # ✅ «Add a Friend» (лист): поле + Paste, Find User, ошибка «User not found…» → карточка игрока
+        │   │   ├── FriendRequestCenter.swift # ✅ входящие заявки на уровне табов: новая → модальный лист, закрыли → плашка сверху до ответа; DEBUG: `simulateIncomingRequest()`
+        │   │   ├── FriendRequestViews.swift  # ✅ лист «New Friend !» (👋, Add to Friends / Reject) и закреплённая плашка с теми же кнопками
+        │   │   └── PlayerCardView.swift   # ✅ карточка игрока: шапка как в Profile + назад, статистика, 3 последних друга + see all, «+ Add Friend» → «Request Sent»
         │   └── Duel/
         │       └── DuelSetupPlaceholderView.swift  # 🚧 выбор упражнения и 30/60/90 с; приглашение — этап 4
-        └── Assets.xcassets/           # ✅ AccentColor = #2A8DFD; Onboarding/OnboardingPushup — фигура с отжиманием (фон вырезан), Onboarding/OnboardingSetupPath — иконка-планшет, Onboarding/Goal* — иконки трёх целей; Paywall/PaywallTrialHero — телефон на пейволе (экспорт из Figma); Onboarding/CameraAccess* — телефон, карточка системного запроса и экран настроек для шага камеры (@3x); иконка приложения пока пустая
+        └── Assets.xcassets/           # ✅ AccentColor = #2A8DFD; Onboarding/OnboardingPushup — фигура с отжиманием (фон вырезан), Onboarding/OnboardingSetupPath — иконка-планшет, Onboarding/Goal* — иконки трёх целей; Paywall/PaywallTrialHero — телефон на пейволе (экспорт из Figma); Onboarding/CameraAccess* — телефон, карточка системного запроса и экран настроек для шага камеры (@3x); RatingRays — фон с лучами на экране Rating (@3x); иконка приложения пока пустая
 ```
 
 ## 2. Настройки проекта
@@ -129,8 +146,8 @@ RepsCounter-Duel/                      # корень git-репозитория
 | `CameraService` | 📋 | приложение | захват кадров, разрешения, прерывания, ориентация |
 | `Auth` | 📋 | приложение | анонимная сессия Supabase, привязка ника к ID; после переустановки — новый профиль, восстановления нет |
 | `Onboarding` | ✅ UI | `Features/Onboarding` | все экраны по макету, реальный запрос камеры; ник, регистрация и покупки — тестовые сервисы (сервер — этап 1) |
-| `Profile` | 🚧 | `Features/Profile` | экран на тестовых данных; друзья и переходы — этап 2 |
-| `Home` / `Statistics` | 🚧 | `Features/Home` | экран на тестовых данных; реальные данные — этап 5 |
+| `Profile` | ✅ UI | `Features/Profile`, `Features/Friends` | Profile и список Friends по макету на тестовых данных; поиск друга, карточка игрока и заявки — следующие экраны |
+| `Home` / `Statistics` | ✅ UI | `Features/Home` | экран по макету в двух состояниях на тестовых данных; реальные данные — этап 5 |
 | `Training` | 📋 | приложение | одиночная тренировка, обновляет рекорд, хранение в SwiftData |
 | `Friends` | 📋 | приложение | поиск по точному нику, карточка игрока, заявки (всплывающий экран + плашка на всех табах), приглашения в дуэль |
 | `Duel` | 🚧 | `Features/Duel` | только временный экран настройки; лобби, отсчёт, матч, результаты — этап 4 |
@@ -139,14 +156,18 @@ RepsCounter-Duel/                      # корень git-репозитория
 ## 4. Ключевые сценарии: где искать код
 
 - **Запуск приложения:** `App/RepsCounter_DuelApp.swift` → `App/RootView.swift` → если онбординг не пройден (`@AppStorage("onboardingCompleted")`) — `OnboardingFlowView`, иначе `MainTabsView`. Сбросить в симуляторе: запуск с аргументом `-onboardingCompleted NO`.
-- **Онбординг:** `OnboardingFlowView` → `IntroPagerView` (слайды `IntroSlide`) → `NicknameStepView` → `NicknameAvailabilityChecking` (сейчас `MockNicknameAvailabilityService`, на этапе 1 — сервер) → `AvatarStepView` (`AvatarEmoji`) → `ProfileReadyStepView` → `ProfileRegistering` (сейчас `MockProfileRegistrationService`; ник заняли за это время → назад на шаг ника) → `MotivationStepView` (`MotivationGoal`) → `TrainOrChallengeStepView` (`RecordsCard`, `RecentDuelCard`) → `BuildingPathStepView` (≈ 5 с анимации, автопереход) → `OnboardingPaywallStepView` → `PaywallView` (`PaywallContent.onboardingTrial`, `MockPaywallPurchaseService`) → `CameraAccessStepView` → `SystemCameraPermission` → доступ есть → `onFinish` ставит флаг и открывает табы.
+- **Онбординг:** `OnboardingFlowView` → `IntroPagerView` (слайды `IntroSlide`) → `NicknameStepView` → `NicknameAvailabilityChecking` (сейчас `MockNicknameAvailabilityService`, на этапе 1 — сервер) → `AvatarStepView` (`AvatarEmoji`) → `ProfileReadyStepView` → `ProfileRegistering` (сейчас `MockProfileRegistrationService`; ник заняли за это время → назад на шаг ника) → `MotivationStepView` (`MotivationGoal`) → `TrainOrChallengeStepView` (`RecordsCard`, `RecentDuelCard`) → `BuildingPathStepView` (≈ 5 с анимации, автопереход) → `PaywallFlowView` → `PaywallView` (`PaywallContent.onboardingTrial`, `MockPaywallPurchaseService`) → `CameraAccessStepView` → `SystemCameraPermission` → доступ есть → `onFinish` ставит флаг и открывает табы.
 - **Нижняя навигация:** `RootView` → `DesignSystem/RCTabBar` (табы из `AppTab`) → кнопка Duel → `Features/Duel/DuelSetupPlaceholderView`.
 - **Данные на экранах:** все экраны берут `Backend/MockData` (параметры по умолчанию во вью) — сервер подключается на этапах 1–5.
-- **Рейтинг:** `RatingView` → `MockData.leaderboard(scope)` → `LeaderboardRanking.rank` (те же правила будут на сервере).
+- **Входящая заявка:** `MainTabsView` держит `FriendRequestCenter` → `.sheet(item: modalRequest)` → `FriendRequestSheet`; закрыли → `bannerRequest` → `FriendRequestBanner` поверх всех табов; ответ → `FriendsServicing.respondToFriendRequest`. Для теста — кнопка Invite на Home (только DEBUG).
+- **Друзья:** Profile → see all → `FriendsListView` → строка друга → `PlayerCardView`; Add Friend / Add New Friend → `AddFriendSheet` → `FriendsServicing.findPlayer` (сейчас `MockFriendsService`) → найден → `PlayerCardView` (стек навигации Profile).
+- **Settings / Edit Profile:** шестерёнка на Home и Profile → `SettingsView` (fullScreenCover); карандаш на Profile → `EditProfileView`; ник и эмодзи хранятся в UserDefaults (`LocalStorageKeys`), Home и Profile обновляются сразу.
+- **Home:** `MainTabsView` → `HomeView(me:overview:)` → `HomeOverview` (`MockData.homeEmpty()` по умолчанию, `homeFilled()` с `-debugDataState filled`) → `WeeklyRepsChart`, `RecordsCard`, `RecentDuelCard`; карточка места → таб Rating; Challenge a Friend и VS → настройка дуэли.
+- **Рейтинг:** `MainTabsView` → `RatingView(me:overview:)` → `RatingOverview` (`.empty` по умолчанию, `MockData.ratingFilled(me:)` с `-debugDataState filled`: я на 24-м месте глобально и на 4-м среди друзей) → `LeaderboardRanking.rank` (те же правила будут на сервере: равные суммы — одно место).
 
 ## 5. Тесты
 
-- Пакет `RepsCounterKit`: Swift Testing, запуск `cd Packages/RepsCounterKit && swift test` (16 тестов: `ExerciseTests`, `LeaderboardRankingTests`, `DuelSummaryTests`, `NicknameAvailabilityTests`, `ProfileRegistrationTests`).
+- Пакет `RepsCounterKit`: Swift Testing, запуск `cd Packages/RepsCounterKit && swift test` (27 тестов: `ExerciseTests`, `LeaderboardRankingTests`, `DuelSummaryTests`, `NicknameAvailabilityTests`, `ProfileRegistrationTests`, `WeekSummaryTests`, `WeeklyRankTests`, `FriendsServiceTests`).
 - Таргета UI-/юнит-тестов в Xcode-проекте пока нет.
 
 ## 6. Бэкенд (Supabase)

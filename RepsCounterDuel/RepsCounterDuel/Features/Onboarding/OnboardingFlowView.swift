@@ -82,7 +82,7 @@ struct OnboardingFlowView: View {
         case .explanationBuildingPath:
             BuildingPathStepView(onFinished: advance)
         case .paywall:
-            OnboardingPaywallStepView(purchases: purchases, onDone: advance)
+            PaywallFlowView(purchases: purchases, onDone: advance)
         case .cameraPermission:
             CameraAccessStepView(permission: cameraPermission, onGranted: finish)
         }
@@ -121,9 +121,9 @@ struct OnboardingFlowView: View {
     // MARK: - Initial state
 
     private enum StorageKey {
-        static let resumeStep = "onboardingResumeStep"
-        static let nickname = "onboardingRegisteredNickname"
-        static let emoji = "onboardingRegisteredEmoji"
+        static let resumeStep = LocalStorageKeys.onboardingResumeStep
+        static let nickname = LocalStorageKeys.nickname
+        static let emoji = LocalStorageKeys.emoji
     }
 
     /// DEBUG `-debugOnboardingStep N` wins; otherwise the remembered resume step; otherwise intro.

@@ -1,8 +1,10 @@
 import SwiftUI
 
-/// Onboarding use of the shared paywall: ✕ and a started trial both continue onboarding;
-/// footer links open the legal sheets; Restore reports the result.
-struct OnboardingPaywallStepView: View {
+/// The shared paywall with its behaviour: ✕ and a started subscription both call `onDone`
+/// (onboarding continues / Settings closes it); footer links open the legal sheets; Restore
+/// reports the result.
+struct PaywallFlowView: View {
+    var content: PaywallContent = .onboardingTrial
     let purchases: any PaywallPurchasing
     let onDone: () -> Void
 
@@ -18,10 +20,10 @@ struct OnboardingPaywallStepView: View {
 
     var body: some View {
         PaywallView(
-            content: .onboardingTrial,
+            content: content,
             isBusy: isBusy,
             onClose: onDone,
-            onPurchase: purchase,
+            onPurchase: { plan in purchase(plan) },
             onTerms: { legalDocument = .terms },
             onPrivacy: { legalDocument = .privacy },
             onRestore: restore
@@ -32,9 +34,9 @@ struct OnboardingPaywallStepView: View {
         }
     }
 
-    private func purchase() {
+    private func purchase(_ plan: PaywallPlan?) {
         run {
-            if try await purchases.purchase() { onDone() }
+            if try await purchases.purchase(planID: plan?.id) { onDone() }
         }
     }
 

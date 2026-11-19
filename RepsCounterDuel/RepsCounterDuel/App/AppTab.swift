@@ -6,9 +6,9 @@ enum AppTab: Hashable, CaseIterable {
 
     var tabBarItem: RCTabBarItem<AppTab> {
         switch self {
-        case .home: RCTabBarItem(.home, title: "Home", systemImage: "house")
-        case .rating: RCTabBarItem(.rating, title: "Rating", systemImage: "trophy")
-        case .profile: RCTabBarItem(.profile, title: "Profile", systemImage: "person.crop.circle")
+        case .home: RCTabBarItem(.home, title: "Home", systemImage: "house.fill")
+        case .rating: RCTabBarItem(.rating, title: "Rating", systemImage: "trophy.fill")
+        case .profile: RCTabBarItem(.profile, title: "Profile", systemImage: "person.fill")
         }
     }
 }
