@@ -8,7 +8,7 @@ Live Duel is a competitive fitness game for iPhone. Users perform squats and pus
 ## 2. Confirmed product decisions
 - Build a native iPhone app with Swift and SwiftUI, with **minimum deployment target iOS 18.0**. Do not raise the deployment target without explicit approval.
 - UI must reproduce the **approved Figma design**; prefer Figma MCP as the source of exact frames, assets, sizes, spacing, and components. The visual direction is classic **light iOS** with Liquid Glass when supported. Do not introduce a dark esports theme.
-- First-run onboarding followed by **Sign in with Apple only**; no email/password or Google sign-in unless explicitly approved later.
+- First-run onboarding followed by **registration with a unique nickname** bound to the user's account (decided 2026-11-19; replaces the earlier Sign in with Apple requirement). **No Sign in with Apple**, email/password or Google sign-in unless explicitly approved later. What the nickname is bound to (e.g. device-held anonymous Supabase session in Keychain, optional recovery later) is an **open decision** — see section 11; do not implement account binding/recovery before it is decided.
 - User profile supports a user-uploaded photo or a default avatar.
 - Main navigation: **Home**, **Rating**, **Profile**, plus a visually separate **Duel** action at the right edge / outside the main body of the bottom bar. Exact layout and accessibility interaction must be validated.
 - Home and Profile: personal statistics, workout history, weekly activity and related progress displays.
@@ -31,15 +31,27 @@ Live Duel is a competitive fitness game for iPhone. Users perform squats and pus
 - Body landmarks: Apple Vision, starting with a tested 2D pipeline; evaluate 3D only if it measurably helps.
 - Pose processing happens **on-device**. Do not upload raw video or frames by default; an eventual evidence/anti-cheat flow requires a separate privacy and product decision.
 - Backend: **Supabase is the selected architecture direction** for Auth, PostgreSQL, Realtime, Storage and server-side functions. Before implementation verify current SDK/API compatibility, configuration and operating costs; do not claim it has already been provisioned.
-- Authenticate with native Sign in with Apple, correctly handling nonces, identity tokens, session restoration and revoked credentials. Do not assume Apple always supplies name/email after the first sign-in.
+- Authentication: nickname registration on top of a Supabase Auth session (no Sign in with Apple). Store session tokens only in the Keychain, handle session restoration, expiry/refresh and a lost or reset device. Nickname uniqueness is enforced server-side (case-insensitive unique constraint), never by the client alone. Nicknames are public identifiers, not credentials.
+- Without an external identity, creating many accounts is cheap. Treat multi-accounting as a leaderboard-abuse risk (section 6): rate-limit registration and keep server-side signals for review.
 - Store photos in access-controlled storage with appropriate file-size/type restrictions. Profiles must never expose private authentication data.
 - Never embed Supabase service-role keys, database secrets or privileged credentials in the client. Use least-privilege Row Level Security and private/authenticated channels.
 - Treat clients as untrusted: they cannot directly award themselves leaderboard points, edit another player's match or finalize a match.
 - Account deletion, data retention and privacy rules need explicit product decisions and platform-compliant implementation before release.
 
+### 3.1 Confirmed project setup (decided 2026-11-19)
+- Xcode project: `RepsCounterDuel/RepsCounterDuel.xcodeproj`, target and shared scheme `RepsCounterDuel`, sources in `RepsCounterDuel/RepsCounterDuel/` (file-system synchronized groups: new files there are picked up automatically). On-screen app name is "RepsCounter:Duel" via `INFOPLIST_KEY_CFBundleDisplayName`.
+- **Never put `:` in any folder, project, target, scheme or file name** — it breaks xcodebuild dependency files.
+- Minimum iOS **18.0**, **iPhone only** (`TARGETED_DEVICE_FAMILY = 1`), **Swift 6 language mode**, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` with approachable concurrency. Camera/Vision processing must explicitly run off the main actor.
+- Bundle ID (`com.RepsCounter-Duel`) and signing team: **do not change** without explicit approval.
+- Verify builds on both the iOS 18.0 and iOS 26.x simulators.
+- Module packaging: **hybrid** — one local Swift package with targets `DesignSystem`, `PoseDetection`/`ExerciseAnalyzer` and `Backend` (pure logic testable via `swift test`), and feature modules (Home, Training, Duel, Ranking, …) as folders in the app target.
+- Backend client: official **`supabase-swift`** with a pinned version; verify current version and iOS 18 compatibility before adding.
+- Training data: **SwiftData** locally with background sync to Supabase, so training works offline.
+- Supabase: only a **`dev`** project (free tier) for now; `prod` is created before beta. Create projects, apply migrations or change data **only on an explicit user command**.
+
 ## 4. Suggested module boundaries
 Keep these independently testable; adapt to the actual repository, and avoid a giant view model:
-- `Auth` — Apple sign-in, auth session and profile bootstrap.
+- `Auth` — nickname registration, auth session (Keychain) and profile bootstrap.
 - `Onboarding` — first launch explanation and camera guidance.
 - `Profile` — nickname/avatar and settings.
 - `Home` / `Statistics` — personal progress and history.
@@ -119,7 +131,7 @@ States: `invited -> joined -> calibrating -> ready -> countdown -> live -> final
 - Include permission, calibration, loading, tracking loss, reconnecting, empty-state and error-state UI; use Figma variants where available; otherwise label new states as provisional.
 - Implement visual comparison/inspection for target devices and iOS 18 and 26+ when test devices/simulators are available; never claim pixel-perfect match without verification.
 - Do not modify Figma files without approval. Do not expose Figma authentication tokens or embed design API secrets in the app.
-- Screen scope: Onboarding, Apple Sign In, Create Profile, Home, Overall/Squats/Push-ups Ranking, Profile, Training Setup, Camera Calibration, Training Live/Results, Duel Setup, Invite/Join, Ready Lobby, Countdown, Live Duel, Results. Screen existence does not mean Figma has all variants; inspect first.
+- Screen scope: Onboarding, Nickname Registration, Create Profile, Home, Overall/Squats/Push-ups Ranking, Profile, Training Setup, Camera Calibration, Training Live/Results, Duel Setup, Invite/Join, Ready Lobby, Countdown, Live Duel, Results. Screen existence does not mean Figma has all variants; inspect first.
 - Opponent live video streaming is **not** an approved feature. Prefer avatar, nickname and live score unless approved design/product requirements say otherwise.
 - App language/localization, sound and haptic preferences remain open decisions.
 
@@ -141,6 +153,7 @@ States: `invited -> joined -> calibrating -> ready -> countdown -> live -> final
 8. Before changing schema, authentication, data migration, camera recording, permissions, signing or production credentials, explain risks and request explicit authorization for destructive or privacy-sensitive changes.
 9. Never reset or delete production/dev user data, leak secrets, or change project signing silently.
 10. When done, report changed files, behavioral changes, build/test commands actually run, outcomes, and unresolved risks.
+11. **Maintain `ProjectTree.md`** (repository root, next to this file) — the shared map of the project for the developer and Claude. Read it at the start of work to orient yourself. In the **same change** that adds, moves, renames or deletes files/modules, or changes how a feature is implemented, update it: the repository tree with a one-line purpose per file/folder, module status (✅ implemented / 🚧 in progress / 📋 planned), key flows as "screen → service → data" with file paths, tests, backend tables/policies/migrations, and the "Last updated" line. Write it **in Russian**, plainly, describing what exists and how it works — never list planned items as implemented. A task that changes structure is not done until `ProjectTree.md` matches the code.
 
 ## 11. Remaining open decisions and configurable MVP defaults
 - Exact Figma file/frame references, approved asset export rules and variant coverage; app UI languages and branded naming.
@@ -150,6 +163,7 @@ States: `invited -> joined -> calibrating -> ready -> countdown -> live -> final
 - **Connection and match policies are proposed MVP defaults** (10-second reconnect grace, disputed/abandoned matches yield zero leaderboard credit, no timer pause); get explicit approval before treating them as business rules for production.
 - No additional duel tie-break: a duel with equal accepted reps is a draw; equal leaderboard totals share the same displayed rank.
 - Repeat-match anti-abuse thresholds, evidence retention, moderation/appeals and when a result may be reinstated.
+- **Nickname account binding and recovery**: what the nickname account is bound to (device-held anonymous session only vs. later linking of email or a recovery code), behavior on a new/reset device, nickname change rules and reserved/offensive nickname filtering. Blocks the Auth stage.
 - Exact profile fields, privacy controls, photo moderation and account deletion UX.
 - Whether match sound, haptics and countdown voice prompts are optional.
 
