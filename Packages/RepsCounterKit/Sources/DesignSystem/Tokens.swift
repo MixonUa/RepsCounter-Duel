@@ -71,6 +71,20 @@ public enum RCColor {
     public static let goalCardTop = Color(rgb: 0x1D71E4)
     public static let goalCardMiddle = Color(rgb: 0x043EB7)
     public static let goalCardBottom = Color(rgb: 0x0237B3)
+    /// FIGMA Choose Activity / Choose Exercise cards: lighter top-right, light-blue description.
+    public static let activityCardTop = Color(rgb: 0x2B8DFE)
+    public static let activityCardMiddle = Color(rgb: 0x1665DA)
+    public static let activityCardText = Color(rgb: 0xA4DCFF)
+    /// FIGMA "Ready to duel?": avatar circle fill and the light end of the VS gradient.
+    public static let lobbyAvatar = Color(rgb: 0x1D72E2)
+    public static let lobbyVS = Color(rgb: 0x9FD0FF)
+    /// FIGMA live duel: opponent red (score bar, badge, Give up text) and the Give up fill.
+    public static let duelRed = Color(rgb: 0xFF2D55)
+    public static let giveUpFill = Color(rgb: 0x2A0E10)
+    /// FIGMA duel results: avatar fills on the win / loss backdrops and the stats card.
+    public static let resultWinAvatar = Color(rgb: 0x1E8494)
+    public static let resultLossAvatar = Color(rgb: 0x594C8E)
+    public static let resultCard = Color(rgb: 0x0E0E0E)
     /// FIGMA: light rim around the icon circle on a goal card.
     public static let goalIconRim = Color(rgb: 0xCFD8F3)
     /// FIGMA: thin divider inside white cards.

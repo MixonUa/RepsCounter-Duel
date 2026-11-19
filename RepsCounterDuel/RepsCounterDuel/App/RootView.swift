@@ -1,6 +1,7 @@
 import SwiftUI
 import Backend
 import DesignSystem
+import ExerciseAnalyzer
 
 /// Shows onboarding on first launch, then the main tabs.
 ///
@@ -21,7 +22,12 @@ struct RootView: View {
 /// Main tabs + custom bottom bar with the separate Duel action.
 struct MainTabsView: View {
     @State private var selectedTab: AppTab = .home
-    @State private var isDuelSetupPresented = false
+    /// Activity sheet: VS → Choose Activity; Home buttons → Choose Exercise in their mode.
+    @State private var activityFlow: ActivityFlowStart?
+    /// Full-screen "Ready to duel?" lobby (host: after the friend accepts; invitee: after Start Duel).
+    @State private var lobby: DuelLobby?
+    /// Host side: the lobby opens once the activity sheet has finished closing.
+    @State private var lobbyAfterSheet: DuelLobby?
 
     /// UI stage: the registered nickname/emoji saved by onboarding (stage 1 reads the profile
     /// from the server).
@@ -37,6 +43,7 @@ struct MainTabsView: View {
 
     @State private var isTabBarHidden = false
     @State private var friendRequests = FriendRequestCenter()
+    @State private var duelInvitations = DuelInvitationCenter()
 
     /// Mock data until stages 2–5: a new player sees the empty states.
     /// DEBUG: `-debugDataState filled` shows the filled Home, Rating and Profile.
@@ -81,25 +88,47 @@ struct MainTabsView: View {
                     selection: $selectedTab,
                     actionText: "VS",
                     actionAccessibilityLabel: "Duel",
-                    action: { isDuelSetupPresented = true }
+                    action: { activityFlow = .chooseActivity }
                 )
                 // RCTabBar already has 4 pt bottom padding above the safe area.
                 .offset(y: safeBottom + RCSpacing.xxs - Self.barBottomGap)
                 .offset(y: isTabBarHidden ? 160 : 0)
                 .allowsHitTesting(!isTabBarHidden)
             }
-            // FIGMA: pinned incoming friend request over every tab (after its modal was closed).
+            // FIGMA: pinned incoming duel invitation / friend request over every tab (after its
+            // modal was closed).
             .overlay(alignment: .top) {
-                if let request = friendRequests.bannerRequest {
-                    FriendRequestBanner(player: request)
-                        .padding(.horizontal, RCSpacing.m)
-                        .padding(.top, RCSpacing.xxs)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                VStack(spacing: RCSpacing.s) {
+                    if let invitation = duelInvitations.bannerInvitation {
+                        DuelInvitationBanner(invitation: invitation)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                    if let request = friendRequests.bannerRequest {
+                        FriendRequestBanner(player: request)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
+                .padding(.horizontal, RCSpacing.m)
+                .padding(.top, RCSpacing.xxs)
             }
             .animation(.snappy, value: friendRequests.bannerRequest?.id)
+            .animation(.snappy, value: duelInvitations.bannerInvitation?.id)
         }
         .environment(friendRequests)
+        .environment(duelInvitations)
+        .task { receiveDebugInvitation() }
+        .sheet(item: $duelInvitations.modalInvitation, onDismiss: duelInvitations.modalDidDismiss) { invitation in
+            DuelInvitationSheet(invitation: invitation)
+                .environment(duelInvitations)
+        }
+        .onChange(of: duelInvitations.acceptedInvitation) { _, invitation in
+            guard let invitation else { return }
+            duelInvitations.acceptedInvitation = nil
+            lobby = DuelLobby(me: me, opponent: invitation.host, exercise: invitation.exercise, duration: invitation.duration, myStats: profileOverview.stats)
+        }
+        .fullScreenCover(item: $lobby) { lobby in
+            DuelLobbyFlow(lobby: lobby)
+        }
         .sheet(item: $friendRequests.modalRequest) { request in
             FriendRequestSheet(player: request)
                 .environment(friendRequests)
@@ -115,9 +144,33 @@ struct MainTabsView: View {
         } message: {
             Text(friendRequests.errorMessage ?? "")
         }
-        .sheet(isPresented: $isDuelSetupPresented) {
-            DuelSetupPlaceholderView()
+        .sheet(item: $activityFlow, onDismiss: {
+            if let pending = lobbyAfterSheet {
+                lobbyAfterSheet = nil
+                lobby = pending
+            }
+        }) { start in
+            ActivityFlowView(
+                start: start,
+                me: me,
+                friends: profileOverview.friends,
+                myStats: profileOverview.stats,
+                onDuelAccepted: { lobbyAfterSheet = $0 }
+            )
         }
+    }
+
+    /// DEBUG `-debugIncomingDuel YES`: a mock friend invites me to a push-ups duel on launch.
+    private func receiveDebugInvitation() {
+        #if DEBUG
+        guard UserDefaults.standard.bool(forKey: "debugIncomingDuel") else { return }
+        duelInvitations.receive(DuelInvitation(
+            host: MockData.friends.first ?? PlayerProfile(nickname: "Nova_07", emoji: "🐧"),
+            exercise: .pushUps,
+            duration: .default,
+            expiresAt: .now.addingTimeInterval(DuelInvitation.defaultLifetime)
+        ))
+        #endif
     }
 
     @ViewBuilder
@@ -127,7 +180,8 @@ struct MainTabsView: View {
             HomeView(
                 me: me,
                 overview: homeOverview,
-                onChallenge: { isDuelSetupPresented = true },
+                onStartTraining: { activityFlow = .chooseExercise(.training) },
+                onChallenge: { activityFlow = .chooseExercise(.duel) },
                 onOpenRating: { selectedTab = .rating }
             )
         case .rating:

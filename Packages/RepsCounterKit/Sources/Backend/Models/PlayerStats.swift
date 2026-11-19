@@ -42,5 +42,23 @@ public struct PlayerStats: Hashable, Codable, Sendable {
         Exercise.allCases.reduce(0) { $0 + trainingRecord(for: $1) }
     }
 
+    /// Stats after a finalized ranked duel: the duel's accepted reps join the total and the
+    /// outcome joins wins / losses / draws (CLAUDE.md §7). Training records are unchanged.
+    public func applying(_ outcome: DuelSummary.Outcome, reps: Int) -> PlayerStats {
+        var stats = self
+        stats.totalDuelReps += max(0, reps)
+        switch outcome {
+        case .win: stats.duelsWon += 1
+        case .loss: stats.duelsLost += 1
+        case .draw: stats.duelsTied += 1
+        }
+        return stats
+    }
+
+    /// Win rate in whole percent (64), or nil before the first duel.
+    public var winRatePercent: Int? {
+        winRate.map { Int(($0 * 100).rounded()) }
+    }
+
     public static let empty = PlayerStats(totalDuelReps: 0, duelsWon: 0, duelsLost: 0, duelsTied: 0)
 }

@@ -98,10 +98,7 @@ struct ProfileView: View {
     }
 
     /// Card for a friend row: the mock search data when known, otherwise a minimal card.
-    private static func card(for item: FriendListItem) -> PlayerCard {
-        MockData.searchablePlayers.first { $0.profile.nickname.lowercased() == item.profile.nickname.lowercased() }
-            ?? PlayerCard(profile: item.profile, stats: .empty, weeklyRank: item.weeklyRank, friends: [], relationship: .friends)
-    }
+    private static func card(for item: FriendListItem) -> PlayerCard { .mock(for: item) }
 
     // MARK: - Stats
 

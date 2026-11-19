@@ -11,11 +11,12 @@ import ExerciseAnalyzer
 struct HomeView: View {
     let me: PlayerProfile
     let overview: HomeOverview
+    var onStartTraining: () -> Void = {}
     var onChallenge: () -> Void = {}
     var onOpenRating: () -> Void = {}
 
     private enum Sheet: String, Identifiable {
-        case training, duelHistory
+        case duelHistory
         var id: String { rawValue }
     }
 
@@ -63,8 +64,6 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $isSettingsPresented) { SettingsView() }
         .sheet(item: $sheet) { sheet in
             switch sheet {
-            case .training:
-                PlaceholderSheet(title: "Training", message: "Training with the camera arrives in a later build.")
             case .duelHistory:
                 PlaceholderSheet(title: "Recent duels", message: "Duel history arrives with the duel screens.")
             }
@@ -180,7 +179,7 @@ struct HomeView: View {
             title: "Set a new record !",
             subtitle: "Start a train to set a reps record",
             button: "Start Train",
-            action: { sheet = .training }
+            action: onStartTraining
         )
     }
 

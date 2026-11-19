@@ -1,0 +1,54 @@
+import Foundation
+import Testing
+@testable import Backend
+
+@Suite struct DuelDurationTests {
+    @Test func stepsByTenSecondsWithinBounds() {
+        var duration = DuelDuration.default
+        duration = duration.incremented()
+        #expect(duration.seconds == 70)
+        #expect(!DuelDuration.presets.contains(duration))
+        #expect(DuelDuration(seconds: 10).canDecrement == false)
+        #expect(DuelDuration(seconds: 600).canIncrement == false)
+        #expect(DuelDuration(seconds: 5).seconds == 10)
+        #expect(DuelDuration(seconds: 9_999).seconds == 600)
+        #expect(DuelDuration(seconds: 64).seconds == 60)
+    }
+
+    @Test func displayNames() {
+        #expect(DuelDuration(seconds: 60).displayName == "1 min")
+        #expect(DuelDuration(seconds: 90).displayName == "1 min 30 s")
+        #expect(DuelDuration(seconds: 40).displayName == "40 s")
+        #expect(DuelDuration.presets.compactMap(\.wholeMinutes) == [1, 2, 3, 5, 10])
+    }
+}
+
+@Suite struct DuelInvitationTests {
+    @Test func countdownAndExpiry() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let invite = DuelInvitation(
+            host: PlayerProfile(nickname: "Nova_07", emoji: "🐧"),
+            exercise: .pushUps,
+            duration: .default,
+            expiresAt: start.addingTimeInterval(DuelInvitation.defaultLifetime)
+        )
+        #expect(DuelInvitation.countdownText(seconds: invite.secondsLeft(at: start)) == "3:00")
+        #expect(invite.secondsLeft(at: start.addingTimeInterval(0.4)) == 180)
+        #expect(DuelInvitation.countdownText(seconds: invite.secondsLeft(at: start.addingTimeInterval(170))) == "0:10")
+        #expect(invite.isExpired(at: start.addingTimeInterval(180)))
+    }
+}
+
+@Suite struct DuelResultStatsTests {
+    @Test func applyingOutcomeUpdatesTotalsAndWinRate() {
+        let before = PlayerStats(totalDuelReps: 83, duelsWon: 16, duelsLost: 9, duelsTied: 0)
+        #expect(before.winRatePercent == 64)
+        let won = before.applying(.win, reps: 17)
+        #expect(won.totalDuelReps == 100)
+        #expect(won.winRatePercent == 65)
+        let lost = before.applying(.loss, reps: 10)
+        #expect(lost.duelsLost == 10)
+        #expect(lost.winRatePercent == 62)
+        #expect(PlayerStats.empty.applying(.draw, reps: 0).winRatePercent == 0)
+    }
+}
