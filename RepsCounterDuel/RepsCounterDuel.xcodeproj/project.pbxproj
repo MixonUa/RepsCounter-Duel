@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4D32CBA430ADEAC700AB5280 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 4D32CBA130ADEAC700AB5280 /* DesignSystem */; };
+		4D32CBA530ADEAC700AB5280 /* ExerciseAnalyzer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D32CBA230ADEAC700AB5280 /* ExerciseAnalyzer */; };
+		4D32CBA630ADEAC700AB5280 /* Backend in Frameworks */ = {isa = PBXBuildFile; productRef = 4D32CBA330ADEAC700AB5280 /* Backend */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		4D32CB8330ADEAC700AB5280 /* RepsCounterDuel.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "RepsCounterDuel.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +29,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4D32CBA430ADEAC700AB5280 /* DesignSystem in Frameworks */,
+				4D32CBA530ADEAC700AB5280 /* ExerciseAnalyzer in Frameworks */,
+				4D32CBA630ADEAC700AB5280 /* Backend in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +74,9 @@
 			);
 			name = "RepsCounterDuel";
 			packageProductDependencies = (
+				4D32CBA130ADEAC700AB5280 /* DesignSystem */,
+				4D32CBA230ADEAC700AB5280 /* ExerciseAnalyzer */,
+				4D32CBA330ADEAC700AB5280 /* Backend */,
 			);
 			productName = "RepsCounterDuel";
 			productReference = 4D32CB8330ADEAC700AB5280 /* RepsCounterDuel.app */;
@@ -94,6 +106,9 @@
 			);
 			mainGroup = 4D32CB7A30ADEAC700AB5280;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4D32CBA030ADEAC700AB5280 /* XCLocalSwiftPackageReference "../Packages/RepsCounterKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4D32CB8430ADEAC700AB5280 /* Products */;
 			projectDirPath = "";
@@ -340,6 +355,28 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4D32CBA030ADEAC700AB5280 /* XCLocalSwiftPackageReference "../Packages/RepsCounterKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/RepsCounterKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4D32CBA130ADEAC700AB5280 /* DesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DesignSystem;
+		};
+		4D32CBA230ADEAC700AB5280 /* ExerciseAnalyzer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ExerciseAnalyzer;
+		};
+		4D32CBA330ADEAC700AB5280 /* Backend */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Backend;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4D32CB7B30ADEAC700AB5280 /* Project object */;
 }
