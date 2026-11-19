@@ -12,7 +12,7 @@
 - **No sign-in of any kind**: no Sign in with Apple, email/password, Google or any other login. The nickname is bound once, on first launch, to the user's account ID (Supabase Auth user ID of an anonymous session). There is no in-app profile reset and **no account recovery**: deleting the app and installing it again creates a new, empty profile with a new nickname. Multi-accounting is an accepted MVP risk.
 - Profile = unique nickname + an **emoji icon** chosen by the user. **No photo upload** of any kind.
 - Main navigation: **Home**, **Rating**, **Profile**, plus a visually separate **Duel** action at the right edge / outside the main body of the bottom bar. Exact layout and accessibility interaction must be validated against Figma.
-- **Home**: extended player statistics, including a chart of **duel repetitions per day** (date → total accepted duel reps that day). **Profile**: compact player statistics and a list of the player's **friends' results**.
+- **Home**: extended player statistics, a chart of **duel repetitions per day** (date → total accepted duel reps that day), the training record, a **Start training** button, a **Recent Duels** block (last duel result, or a **Challenge to a duel** button when there are none) and the player's **current rating place**. **Profile**: emoji icon, nickname, compact player statistics and a short list of **friends' results** (top 3); **See all** opens the full friends list, **Add friend** opens friend search; with no friends only an **Add friend** button is shown.
 - **Training record**: a separate field holding the best result achieved in training. Training never feeds the daily duel chart or rankings.
 - Exercises: **squats** and **push-ups**.
 - **Training** mode: individual camera-based workouts count accepted repetitions and update the personal training record; training repetitions do not contribute to rankings or to the daily duel chart. Training works offline once the user is registered.
@@ -26,13 +26,14 @@
 - Duels use **strict repetition counting**, including pose quality, required range of motion, correct phase sequence and a return to the start position.
 - Winner is the player with more accepted repetitions. Equal scores are a **draw**; there is no tie-break.
 - Ranking is based on **accepted repetitions from finalized, valid ranked duels only**.
-- Rating screen has **Overall**, **Squats**, and **Push-ups** leaderboards, each available **globally** and **among friends**. Overall is the sum of each player's counted Squats + Push-ups duel repetitions; separate categories use their respective exercise totals.
+- Rating screen has **one leaderboard** with a **Global / Friends** selector. The score is the **single total** of accepted duel repetitions (squats + push-ups combined). There are **no per-exercise leaderboards or per-exercise statistics** anywhere in the UI (decided 2026-11-19, follows Figma). Training repetitions are never included.
 - Both players' accepted reps can count toward their leaderboard totals after a valid completed duel, regardless of who wins. Wins/losses and win rate are separate statistics, not leaderboard scoring factors.
 - An interrupted, disputed, invalid or unfinalized match does not award leaderboard repetitions. Default MVP resolution rules are in section 6; any subsequent policy change requires explicit approval.
 
 ## 3. Technology and security boundaries
 - UI: SwiftUI, SF Symbols, native accessibility APIs where suitable; support iOS 18 and later. Use iOS 26+ Liquid Glass APIs only within availability-guarded branches, with design-faithful standard SwiftUI/material fallbacks for iOS 18–25. Test both ranges.
 - Camera: AVFoundation; handle permission refusal, camera interruption and device orientation.
+- **Camera permission gates app entry** (Figma requirement, decided 2026-11-19): the last onboarding step requests camera access; if denied, a "camera tips" screen with an **Open Settings** button is shown, and the user reaches Home only after access is granted (also re-check when access is revoked later). Risk to recheck before App Store submission: Guideline 5.1.1 (forcing permissions).
 - Body landmarks: Apple Vision, starting with a tested 2D pipeline; evaluate 3D only if it measurably helps.
 - Pose processing happens **on-device**. Do not upload raw video or frames by default; an eventual evidence/anti-cheat flow requires a separate privacy and product decision.
 - Backend: **Supabase is the selected architecture direction** for Auth, PostgreSQL, Realtime, Storage and server-side functions. Before implementation verify current SDK/API compatibility, configuration and operating costs; do not claim it has already been provisioned.
@@ -69,7 +70,7 @@ Keep these independently testable; adapt to the actual repository, and avoid a g
 - `Training` — solo workout session lifecycle and persistence.
 - `Friends` — username lookup, friend requests, accept/decline, block/remove and in-app duel invitations.
 - `Duel` — invitations, lobby, readiness, countdown, match and results.
-- `Ranking` — Overall / Squats / Push-ups views and leaderboard data.
+- `Ranking` — single total-reps leaderboard (Global / Friends) and leaderboard data.
 - `Backend` — Supabase SDK, repositories, auth-safe API calls and realtime synchronization.
 - `DesignSystem` — semantic colors, typography, components, motions and accessibility.
 
@@ -91,6 +92,8 @@ Friend-based in-app invitations are **confirmed**. MVP behavior below is a **pro
 ### Friends and invitations
 - Provide an in-app Friends screen reachable from the approved UI flow (do not add an unapproved fifth tab). Search only by the exact, case-insensitive username (it is unique, so no extra identifier is needed). Never expose account IDs, push tokens or private auth data.
 - Friend requests: `pending -> accepted | declined | cancelled`; only accepted friends can invite each other. Support unfriend and block, with server-side authorization and privacy controls.
+- **Add friend** flow (Figma): search by exact nickname → found player's card: emoji icon, nickname, short statistics, **that player's friends list** (public by product decision 2026-11-19) and an **Add to friends** button.
+- **Incoming friend request UI** (decided 2026-11-19): a pop-up screen "<nickname> wants to add you as a friend" with **Accept**, **Decline** and a close (✕) button. If closed without answering, a banner with the same text and Accept / Decline buttons stays pinned at the top of every tab until the request is answered.
 - Invites are in-app records tied to host and intended friend, exercise and 30/60/90 s duration. A friend can accept or decline only their own invite. Prevent a player joining two active matches. Expire pending invites after a configurable default of 2 minutes; cancel if host withdraws or disconnects before acceptance. Prevent duplicate and stale acceptance with transactional checks.
 - Push notifications may be added later; an in-app invitation inbox and realtime updates are sufficient for MVP. An invitation must remain fetchable from database after a missed realtime event.
 
@@ -124,7 +127,7 @@ States: `invited -> joined -> calibrating -> ready -> countdown -> live -> final
 
 ## 7. Leaderboard and statistics invariants
 - Maintain immutable/finalized duel result records as the audit source; derive leaderboard totals from eligible completed duel results or maintain a server-updated aggregate with idempotent transactions.
-- `overallReps = completedRankedSquatReps + completedRankedPushupReps` for each player.
+- `totalDuelReps = completedRankedSquatReps + completedRankedPushupReps` for each player — the only leaderboard and statistics total shown in the UI. Per-exercise reps may be kept in duel records (each duel has one exercise) but are not displayed or ranked separately.
 - Distinguish `trainingRecord`, `duelReps`, `duelsWon`, `duelsLost`, `duelsTied`, and **daily duel reps** (per calendar day, the sum of accepted reps from finalized duels — the source of the Home chart); do not combine training with leaderboard totals or the daily chart.
 - Friends leaderboards use the same totals and ranking rules as global ones, limited to the player and their accepted friends.
 - If two players have equal leaderboard totals, show the **same displayed rank**; use a stable secondary sort such as public username and account ID for deterministic pagination, never represent that sort as a sporting tiebreaker.
@@ -140,9 +143,14 @@ States: `invited -> joined -> calibrating -> ready -> countdown -> live -> final
 - Include permission, calibration, loading, tracking loss, reconnecting, empty-state and error-state UI; use Figma variants where available; otherwise label new states as provisional.
 - Implement visual comparison/inspection for target devices and iOS 18 and 26+ when test devices/simulators are available; never claim pixel-perfect match without verification.
 - Do not modify Figma files without approval. Do not expose Figma authentication tokens or embed design API secrets in the app.
-- Screen scope: Onboarding, Nickname Registration (with emoji choice), Home, Overall/Squats/Push-ups Ranking (Global / Friends), Profile, Training Setup, Camera Calibration, Training Live/Results, Duel Setup, Invite/Join, Ready Lobby, Countdown, Live Duel, Results. Screen existence does not mean Figma has all variants; inspect first.
+- Screen scope: Onboarding (see 8.1), Home, Rating (Global / Friends, single total), Profile, Friends list (See all), Add Friend search + player card, incoming friend request pop-up + pinned banner, Training Setup, Camera Calibration, Training Live/Results, Duel Setup, Invite/Join, Ready Lobby, Countdown, Live Duel, Results. Screen existence does not mean Figma has all variants; inspect first.
 - Opponent live video streaming is **not** an approved feature. Show the opponent's emoji icon, nickname and live score unless approved design/product requirements say otherwise.
 - UI text is **English only**. Sound and haptic preferences remain open decisions.
+
+### 8.1 Screen inventory from Figma (described by the user 2026-11-19; Figma MCP access still pending)
+- **Onboarding, in order:** 2 intro slides → nickname registration → emoji choice → confirm nickname + emoji (server registration) → motivation choice (3 buttons; engagement only, not stored on the server and does not affect app logic) → 3 explanation slides → camera permission → Home, or the "camera tips" screen with **Open Settings** until permission is granted.
+- **Tab bar:** Home, Rating, Profile + a separate Duel button on the right.
+- Not yet designed (decide later; build as labelled provisional states): incoming duel invitation for the invitee, nickname-taken / offline errors, duel reconnect / interrupted / under-review states, unfriend/block, training-record definition.
 
 ## 9. Tests and definition of done
 - Build with the actual installed Xcode version and project deployment target; do not presume latest APIs work on the supported minimum iOS version.
@@ -181,7 +189,7 @@ States: `invited -> joined -> calibrating -> ready -> countdown -> live -> final
 
 ## 12. Product invariants and safeguards
 - In-app invitation **from the friends list** is the only approved opponent discovery mechanism. Every accepted duel is **ranked**, with host choice of 30, 60 or 90 seconds; there is no friendly switch.
-- The ranking shows **Overall**, **Squats** and **Push-ups**, where Overall = qualified squat reps + qualified push-up reps. Training repetitions never affect any global leaderboard.
+- The ranking shows a **single total** = qualified squat reps + qualified push-up reps from duels, Global and among Friends. Training repetitions never affect any leaderboard or statistic other than the training record.
 - Winners are determined by valid repetitions during the agreed window; a tie is allowed. A losing player still receives earned leaderboard repetitions if both results are verified and the duel is finalized.
 - **Important:** detailed thresholds for reconnect, friend invite expiry, anti-abuse review and disputed matches are documented as proposed MVP policies, not user-approved business rules. Keep them configurable, test their UX, and request sign-off before production release. The safe invariant remains: never award repetitions for invalid, disputed or interrupted matches.
 
