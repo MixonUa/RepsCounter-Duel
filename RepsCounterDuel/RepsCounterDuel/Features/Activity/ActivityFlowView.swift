@@ -38,6 +38,8 @@ struct ActivityFlowView: View {
     var myStats: PlayerStats = .empty
     /// The friend accepted: the sheet closes and the full-screen lobby opens.
     var onDuelAccepted: (DuelLobby) -> Void = { _ in }
+    /// Training exercise chosen: the sheet closes and the full-screen training opens.
+    var onTrainingStart: (Exercise) -> Void = { _ in }
     var friendsService: any FriendsServicing = MockFriendsService()
 
     private enum Route: Hashable {
@@ -45,7 +47,6 @@ struct ActivityFlowView: View {
         case chooseFriend(Exercise)
         case duelTime(Exercise, FriendListItem)
         case challengeSent(Exercise, FriendListItem, DuelDuration)
-        case trainingNext(Exercise)
         case player(PlayerCard)
         case playerFriends(PlayerCard)
     }
@@ -82,13 +83,6 @@ struct ActivityFlowView: View {
                             onDuelAccepted(DuelLobby(me: me, opponent: friend.profile, exercise: exercise, duration: duration, myStats: myStats))
                             dismiss()
                         })
-                    case .trainingNext(let exercise):
-                        ActivityNextStepPlaceholder(
-                            title: "Training · \(exercise.displayName)",
-                            message: "Training setup and the camera screens arrive next.",
-                            onBack: { path.removeLast() },
-                            onClose: { dismiss() }
-                        )
                     case .player(let card):
                         PlayerCardView(card: card, service: friendsService, onSeeAllFriends: { path.append(.playerFriends(card)) })
                     case .playerFriends(let card):
@@ -112,7 +106,9 @@ struct ActivityFlowView: View {
     /// Training goes to its setup; a duel first needs a friend.
     private func choose(_ exercise: Exercise, in mode: ActivityMode) {
         switch mode {
-        case .training: path.append(.trainingNext(exercise))
+        case .training:
+            onTrainingStart(exercise)
+            dismiss()
         case .duel: path.append(.chooseFriend(exercise))
         }
     }
@@ -262,42 +258,6 @@ private struct ActivityCardButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.9 : 1)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
-    }
-}
-
-// MARK: - Next step (not designed yet)
-
-/// PROVISIONAL: the screens after Choose Exercise (training setup / duel setup) come next.
-private struct ActivityNextStepPlaceholder: View {
-    let title: String
-    let message: String
-    let onBack: () -> Void
-    let onClose: () -> Void
-
-    var body: some View {
-        VStack(spacing: RCSpacing.m) {
-            HStack {
-                RCBackButton(action: onBack)
-                Spacer()
-                ActivityCloseButton(action: onClose)
-            }
-            .padding(.horizontal, RCSpacing.m)
-            .padding(.top, RCSpacing.m)
-
-            Spacer()
-            Text(title)
-                .font(RCFont.sectionTitle)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, RCSpacing.m)
-            Text(message)
-                .font(RCFont.body)
-                .foregroundStyle(RCColor.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, RCSpacing.xl)
-            Spacer()
-        }
-        .background(RCColor.background.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
     }
 }
 

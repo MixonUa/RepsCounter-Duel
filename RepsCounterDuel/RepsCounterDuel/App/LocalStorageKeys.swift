@@ -9,6 +9,9 @@ enum LocalStorageKeys {
     static let repSound = "settingsRepSound"
     /// Settings → First day of the week (2 = Monday, 1 = Sunday).
     static let firstWeekday = "settingsFirstWeekday"
+
+    /// Training totals and per-exercise records (JSON `TrainingProgress`), until SwiftData (stage 3).
+    static let trainingProgress = "trainingProgress"
 }
 
 /// Links used by Settings and the paywall. PROVISIONAL: nil until they exist.

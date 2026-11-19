@@ -52,3 +52,19 @@ import Testing
         #expect(PlayerStats.empty.applying(.draw, reps: 0).winRatePercent == 0)
     }
 }
+
+@Suite struct TrainingProgressTests {
+    @Test func totalsAndRecordsPerExercise() {
+        var progress = TrainingProgress()
+        let results = [
+            progress.add(reps: 20, of: .squats),
+            progress.add(reps: 12, of: .squats),
+            progress.add(reps: 5, of: .pushUps),
+            progress.add(reps: 0, of: .pushUps),
+        ]
+        #expect(results == [true, false, true, false])
+        #expect(progress.totalReps == 37)
+        #expect(progress.record(for: .squats) == 20)
+        #expect(progress.record(for: .pushUps) == 5)
+    }
+}

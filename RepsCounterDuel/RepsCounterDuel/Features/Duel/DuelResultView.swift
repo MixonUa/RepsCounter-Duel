@@ -240,7 +240,7 @@ private struct ResultPlayer: View {
 }
 
 /// One column of the stats card: accent icon, big value with a small unit and colored change.
-private struct ResultStat: View {
+struct ResultStat: View {
     let systemImage: String
     let value: String
     let unit: String?

@@ -28,6 +28,11 @@ struct MainTabsView: View {
     @State private var lobby: DuelLobby?
     /// Host side: the lobby opens once the activity sheet has finished closing.
     @State private var lobbyAfterSheet: DuelLobby?
+    /// Full-screen training for the chosen exercise (opens once the activity sheet has closed).
+    @State private var training: Exercise?
+    @State private var trainingAfterSheet: Exercise?
+    /// Training total reps + per-exercise records kept on the phone.
+    @State private var trainingStore = TrainingProgressStore()
 
     /// UI stage: the registered nickname/emoji saved by onboarding (stage 1 reads the profile
     /// from the server).
@@ -58,9 +63,11 @@ struct MainTabsView: View {
     @AppStorage(LocalStorageKeys.firstWeekday) private var firstWeekday = 2
 
     private var homeOverview: HomeOverview {
-        showsFilledData
-            ? MockData.homeFilled(firstWeekday: firstWeekday)
-            : MockData.homeEmpty(firstWeekday: firstWeekday)
+        if showsFilledData { return MockData.homeFilled(firstWeekday: firstWeekday) }
+        var overview = MockData.homeEmpty(firstWeekday: firstWeekday)
+        // Real training records saved on the phone (the rest of Home stays mock until stage 5).
+        overview.trainingRecords = trainingStore.progress.records
+        return overview
     }
 
     private var profileOverview: ProfileOverview {
@@ -129,6 +136,9 @@ struct MainTabsView: View {
         .fullScreenCover(item: $lobby) { lobby in
             DuelLobbyFlow(lobby: lobby)
         }
+        .fullScreenCover(item: $training) { exercise in
+            TrainingFlow(me: me, exercise: exercise, rank: homeOverview.rank, store: trainingStore)
+        }
         .sheet(item: $friendRequests.modalRequest) { request in
             FriendRequestSheet(player: request)
                 .environment(friendRequests)
@@ -149,13 +159,18 @@ struct MainTabsView: View {
                 lobbyAfterSheet = nil
                 lobby = pending
             }
+            if let pending = trainingAfterSheet {
+                trainingAfterSheet = nil
+                training = pending
+            }
         }) { start in
             ActivityFlowView(
                 start: start,
                 me: me,
                 friends: profileOverview.friends,
                 myStats: profileOverview.stats,
-                onDuelAccepted: { lobbyAfterSheet = $0 }
+                onDuelAccepted: { lobbyAfterSheet = $0 },
+                onTrainingStart: { trainingAfterSheet = $0 }
             )
         }
     }

@@ -218,12 +218,14 @@ private struct LobbyPlayer: View {
 }
 
 /// FIGMA: translucent white glass circle with a white chevron (on the dark backdrop).
-private struct LobbyBackButton: View {
+struct LobbyBackButton: View {
+    var systemImage = "chevron.left"
+    var accessibilityLabel = "Leave the duel"
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "chevron.left")
+            Image(systemName: systemImage)
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: RCSize.backButton, height: RCSize.backButton)
@@ -232,7 +234,7 @@ private struct LobbyBackButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Leave the duel")
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 
