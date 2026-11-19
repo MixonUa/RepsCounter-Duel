@@ -3,7 +3,7 @@
 > Живая карта проекта: что реализовано, как и где лежит. Обновляется вместе с кодом (правила — в `CLAUDE.md`, раздел 10).
 > Статусы: ✅ реализовано · 🚧 в работе · 📋 запланировано (ещё нет в коде)
 
-**Последнее обновление:** 2026-11-19 — «Этап UI», шаг 1: онбординг — вводные слайды 1–2, экран ника (с ошибкой «ник занят»), выбор аватара и «Your Profile Is Ready!» по макету Figma, остальные шаги заглушками; прогресс-бар и кнопка «назад»; токены цвета и кнопки сняты с макета; приложение закреплено в светлой теме.
+**Последнее обновление:** 2026-11-19 — «Этап UI», шаг 1: онбординг — вводные слайды 1–2, экран ника (с ошибкой «ник занят»), выбор аватара, «Your Profile Is Ready!» и выбор цели по макету Figma, остальные шаги заглушками; прогресс-бар и кнопка «назад»; токены цвета и кнопки сняты с макета; приложение закреплено в светлой теме.
 
 **Дизайн:** [Figma — Vibecode-test](https://www.figma.com/design/sdECikkyovjvnloQ6SqFqo/Vibecode-test) (источник истины для экранов). Доступа через Figma MCP пока нет. Экраны верстаются по PNG-экспортам фреймов: значения, снятые с макета, помечены в коде `FIGMA`, придуманные — `PROVISIONAL`.
 
@@ -65,6 +65,8 @@ RepsCounter-Duel/                      # корень git-репозитория
         │   │   ├── AvatarEmoji.swift      # ✅ список из 21 эмодзи-мордочки (первая выбрана по умолчанию)
         │   │   ├── OnboardingAvatarCircle.swift # ✅ большой эмодзи-аватар в голубом круге с белым свечением
         │   │   ├── ProfileReadyStepView.swift   # ✅ «Your Profile Is Ready!»: аватар + ник, «Great !» регистрирует профиль (тестовый сервис)
+        │   │   ├── MotivationGoal.swift   # ✅ три цели (Get Stronger / Maintain Discipline / Challenge Friends); выбор нигде не сохраняется
+        │   │   ├── MotivationStepView.swift # ✅ «What Is Your Main Goal ?»: три синие карточки с иконками из Figma, тап по любой — дальше
         │   │   ├── AvatarStepView.swift   # ✅ выбор аватара: большой превью-кружок + прокручиваемая сетка 3 в ряд, выбор нельзя снять
         │   │   ├── NicknameStepView.swift # ✅ ввод ника: клавиатура сразу, Continue активна с первого символа, проверка ника, ошибка «занят» / «нет сети»
         │   │   ├── OnboardingFlowView.swift   # ✅ переключение шагов вперёд/назад, общий фон и шапка с прогрессом; шаги без макета — заглушки (DEBUG: `-debugOnboardingStep N`)
@@ -81,7 +83,7 @@ RepsCounter-Duel/                      # корень git-репозитория
         │   │   └── ProfileView.swift  # ✅ эмодзи, ник, компактная статистика, топ-3 друзей, See all / Add friend (кнопки пока пустые)
         │   └── Duel/
         │       └── DuelSetupPlaceholderView.swift  # 🚧 выбор упражнения и 30/60/90 с; приглашение — этап 4
-        └── Assets.xcassets/           # ✅ AccentColor = #2A8DFD; Onboarding/OnboardingPushup — фигура с отжиманием (фон вырезан), Onboarding/OnboardingSetupPath — иконка-планшет; иконка приложения пока пустая
+        └── Assets.xcassets/           # ✅ AccentColor = #2A8DFD; Onboarding/OnboardingPushup — фигура с отжиманием (фон вырезан), Onboarding/OnboardingSetupPath — иконка-планшет, Onboarding/Goal* — иконки трёх целей; иконка приложения пока пустая
 ```
 
 ## 2. Настройки проекта
@@ -111,7 +113,7 @@ RepsCounter-Duel/                      # корень git-репозитория
 | `Backend` | 🚧 | пакет `RepsCounterKit` | модели, правила рейтинга, тестовые данные, фабрика SupabaseClient; репозитории и Realtime — дальше |
 | `CameraService` | 📋 | приложение | захват кадров, разрешения, прерывания, ориентация |
 | `Auth` | 📋 | приложение | анонимная сессия Supabase, привязка ника к ID; после переустановки — новый профиль, восстановления нет |
-| `Onboarding` | 🚧 | `Features/Onboarding` | вводные слайды 1–2, экран ника и выбор аватара и «Profile Is Ready» по макету; остальные шаги — заглушки; регистрация и разрешение камеры — этап 1 |
+| `Onboarding` | 🚧 | `Features/Onboarding` | вводные слайды 1–2, экран ника, выбор аватара, «Profile Is Ready» и выбор цели по макету; остальные шаги — заглушки; регистрация и разрешение камеры — этап 1 |
 | `Profile` | 🚧 | `Features/Profile` | экран на тестовых данных; друзья и переходы — этап 2 |
 | `Home` / `Statistics` | 🚧 | `Features/Home` | экран на тестовых данных; реальные данные — этап 5 |
 | `Training` | 📋 | приложение | одиночная тренировка, обновляет рекорд, хранение в SwiftData |
@@ -122,7 +124,7 @@ RepsCounter-Duel/                      # корень git-репозитория
 ## 4. Ключевые сценарии: где искать код
 
 - **Запуск приложения:** `App/RepsCounter_DuelApp.swift` → `App/RootView.swift` → если онбординг не пройден (`@AppStorage("onboardingCompleted")`) — `OnboardingFlowView`, иначе `MainTabsView`. Сбросить в симуляторе: запуск с аргументом `-onboardingCompleted NO`.
-- **Онбординг:** `OnboardingFlowView` → `IntroPagerView` (слайды `IntroSlide`) → `NicknameStepView` → `NicknameAvailabilityChecking` (сейчас `MockNicknameAvailabilityService`, на этапе 1 — сервер) → `AvatarStepView` (`AvatarEmoji`) → `ProfileReadyStepView` → `ProfileRegistering` (сейчас `MockProfileRegistrationService`; ник заняли за это время → назад на шаг ника) → шаги-заглушки → `onFinish` ставит флаг.
+- **Онбординг:** `OnboardingFlowView` → `IntroPagerView` (слайды `IntroSlide`) → `NicknameStepView` → `NicknameAvailabilityChecking` (сейчас `MockNicknameAvailabilityService`, на этапе 1 — сервер) → `AvatarStepView` (`AvatarEmoji`) → `ProfileReadyStepView` → `ProfileRegistering` (сейчас `MockProfileRegistrationService`; ник заняли за это время → назад на шаг ника) → `MotivationStepView` (`MotivationGoal`) → шаги-заглушки → `onFinish` ставит флаг.
 - **Нижняя навигация:** `RootView` → `DesignSystem/RCTabBar` (табы из `AppTab`) → кнопка Duel → `Features/Duel/DuelSetupPlaceholderView`.
 - **Данные на экранах:** все экраны берут `Backend/MockData` (параметры по умолчанию во вью) — сервер подключается на этапах 1–5.
 - **Рейтинг:** `RatingView` → `MockData.leaderboard(scope)` → `LeaderboardRanking.rank` (те же правила будут на сервере).

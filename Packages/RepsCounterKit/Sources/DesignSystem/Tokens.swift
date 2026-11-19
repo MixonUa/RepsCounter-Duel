@@ -66,6 +66,12 @@ public enum RCColor {
     /// FIGMA: circle behind an emoji avatar (grid cell / large preview).
     public static let avatarFill = Color(rgb: 0xC1DBFE)
     public static let avatarFillLarge = Color(rgb: 0xB1CFF9)
+    /// FIGMA: deep-blue goal card gradient (top highlight → body → bottom).
+    public static let goalCardTop = Color(rgb: 0x1D71E4)
+    public static let goalCardMiddle = Color(rgb: 0x043EB7)
+    public static let goalCardBottom = Color(rgb: 0x0237B3)
+    /// FIGMA: light rim around the icon circle on a goal card.
+    public static let goalIconRim = Color(rgb: 0xCFD8F3)
     public static let win = Color.green
     public static let loss = Color.red
     public static let draw = Color.orange

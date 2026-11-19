@@ -22,8 +22,8 @@ enum OnboardingStep: Int, CaseIterable {
         OnboardingStep(rawValue: rawValue - 1)
     }
 
-    /// Top progress bar value, shown on 6 screens. Nickname 20%, emoji 30%, profile 40%
-    /// (confirmed 2026-11-19); the later values are PROVISIONAL until their frames arrive.
+    /// Top progress bar value, shown on 6 screens. Nickname 20%, emoji 30%, profile 40%,
+    /// goal 68% (confirmed / measured from Figma 2026-11-19); the later values are PROVISIONAL.
     var progress: Double? {
         switch self {
         case .intro, .cameraTips: nil

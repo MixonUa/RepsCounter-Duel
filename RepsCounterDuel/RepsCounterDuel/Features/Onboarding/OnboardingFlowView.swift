@@ -57,7 +57,7 @@ struct OnboardingFlowView: View {
                 onNicknameTaken: { go(to: .nickname) }
             )
         case .motivation:
-            OnboardingPlaceholderStepView(title: "Your motivation", onContinue: advance)
+            MotivationStepView(onSelect: { _ in advance() })
         case .explanation:
             OnboardingPlaceholderStepView(title: "How it works", onContinue: advance)
         case .cameraPermission:
