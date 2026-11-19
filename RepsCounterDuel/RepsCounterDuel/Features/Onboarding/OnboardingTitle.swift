@@ -5,10 +5,13 @@ import DesignSystem
 struct OnboardingTitle: View {
     private let line: String
     private let accent: String
+    private let accentColor: Color
 
-    init(_ line: String, accent: String) {
+    /// `accentColor` lets a screen keep both lines black (e.g. "Camera is Restricted").
+    init(_ line: String, accent: String, accentColor: Color = RCColor.accent) {
         self.line = line
         self.accent = accent
+        self.accentColor = accentColor
     }
 
     var body: some View {
@@ -16,7 +19,7 @@ struct OnboardingTitle: View {
             Text(line)
                 .foregroundStyle(RCColor.textPrimary)
             Text(accent)
-                .foregroundStyle(RCColor.accent)
+                .foregroundStyle(accentColor)
         }
         .font(RCFont.onboardingTitle)
         .multilineTextAlignment(.center)

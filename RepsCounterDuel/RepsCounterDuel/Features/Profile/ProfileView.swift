@@ -41,7 +41,7 @@ struct ProfileView: View {
         HStack {
             RCStatTile(value: "\(stats.totalDuelReps)", label: "Duel reps")
             RCStatTile(value: "\(stats.duelsWon)/\(stats.duelsLost)/\(stats.duelsTied)", label: "W / L / D")
-            RCStatTile(value: "\(stats.trainingRecord)", label: "Training record")
+            RCStatTile(value: "\(stats.trainingRecordTotal)", label: "Training record")
         }
         .rcCard()
     }

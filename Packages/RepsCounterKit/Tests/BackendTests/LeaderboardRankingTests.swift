@@ -55,7 +55,18 @@ import Testing
 
     @Test func winRateIsNilWithoutDuels() {
         #expect(PlayerStats.empty.winRate == nil)
-        let stats = PlayerStats(totalDuelReps: 0, duelsWon: 1, duelsLost: 2, duelsTied: 1, trainingRecord: 0)
+        let stats = PlayerStats(totalDuelReps: 0, duelsWon: 1, duelsLost: 2, duelsTied: 1)
         #expect(stats.winRate == 0.25)
+    }
+
+    @Test func trainingRecordsArePerExerciseWithASum() {
+        let stats = PlayerStats(totalDuelReps: 500, duelsWon: 0, duelsLost: 0, duelsTied: 0,
+                                trainingRecords: [.pushUps: 74, .squats: 82])
+        #expect(stats.trainingRecord(for: .pushUps) == 74)
+        #expect(stats.trainingRecord(for: .squats) == 82)
+        #expect(stats.trainingRecordTotal == 156)
+        // Training never changes the duel total.
+        #expect(stats.totalDuelReps == 500)
+        #expect(PlayerStats.empty.trainingRecordTotal == 0)
     }
 }

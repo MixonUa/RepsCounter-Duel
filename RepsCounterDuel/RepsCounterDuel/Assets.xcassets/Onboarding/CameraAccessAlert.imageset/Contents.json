@@ -1,0 +1,6 @@
+{
+  "images" : [
+    { "filename" : "camera_access_alert.png", "idiom" : "universal", "scale" : "3x" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}

@@ -3,7 +3,7 @@
 > Живая карта проекта: что реализовано, как и где лежит. Обновляется вместе с кодом (правила — в `CLAUDE.md`, раздел 10).
 > Статусы: ✅ реализовано · 🚧 в работе · 📋 запланировано (ещё нет в коде)
 
-**Последнее обновление:** 2026-11-19 — «Этап UI», шаг 1: онбординг — вводные слайды 1–2, экран ника (с ошибкой «ник занят»), выбор аватара, «Your Profile Is Ready!» и выбор цели по макету Figma, остальные шаги заглушками; прогресс-бар и кнопка «назад»; токены цвета и кнопки сняты с макета; приложение закреплено в светлой теме.
+**Последнее обновление:** 2026-11-19 — «Этап UI», шаг 1: онбординг — вводные слайды 1–2, экран ника (с ошибкой «ник занят»), выбор аватара, «Your Profile Is Ready!», весь онбординг по макету Figma: слайды, ник, аватар, профиль, цель, слайды-объяснения, пейвол и запрос камеры (с экраном «доступ запрещён» и Open Settings); онбординг продолжается с места остановки после перезапуска; прогресс-бар и кнопка «назад»; токены цвета и кнопки сняты с макета; приложение закреплено в светлой теме.
 
 **Дизайн:** [Figma — Vibecode-test](https://www.figma.com/design/sdECikkyovjvnloQ6SqFqo/Vibecode-test) (источник истины для экранов). Доступа через Figma MCP пока нет. Экраны верстаются по PNG-экспортам фреймов: значения, снятые с макета, помечены в коде `FIGMA`, придуманные — `PROVISIONAL`.
 
@@ -38,7 +38,7 @@ RepsCounter-Duel/                      # корень git-репозитория
 │       │   ├── ExerciseAnalyzer/
 │       │   │   └── Exercise.swift     # ✅ упражнения: squats, push-ups (машины состояний — этап 3)
 │       │   └── Backend/
-│       │       ├── Models/            # ✅ PlayerProfile, PlayerStats, DailyDuelReps, DuelDuration, DuelSummary, LeaderboardEntry
+│       │       ├── Models/            # ✅ PlayerProfile, PlayerStats (рекорды тренировок по упражнению + их сумма), DailyDuelReps, DuelDuration, DuelSummary, LeaderboardEntry
 │       │       ├── ProfileRegistration.swift  # ✅ протокол регистрации профиля + тестовый сервис (admin → «занят», offline → нет сети)
 │       │       ├── NicknameAvailability.swift # ✅ протокол проверки ника + NicknameRules + тестовый сервис (занят только admin; `offline` — имитация нет сети)
 │       │       ├── LeaderboardRanking.swift   # ✅ сортировка рейтинга: равные суммы — одно место, стабильная вторичная сортировка
@@ -57,23 +57,37 @@ RepsCounter-Duel/                      # корень git-репозитория
         │   ├── RepsCounter_DuelApp.swift  # ✅ точка входа (@main), показывает RootView
         │   ├── AppTab.swift           # ✅ табы Home / Rating / Profile (Duel — не таб, а отдельная кнопка)
         │   └── RootView.swift         # ✅ RootView: онбординг до завершения, затем MainTabsView (текущий таб + RCTabBar, кнопка Duel → настройка дуэли)
+        ├── Services/
+        │   └── CameraPermission.swift # ✅ статус и запрос доступа к камере (AVFoundation); часть будущего CameraService
+        ├── Shared/Components/
+        │   ├── RecordsCard.swift      # ✅ карточка «Your records»: две колонки (иконка, число, подпись, «+N this week»), для онбординга и Home
+        │   └── RecentDuelCard.swift   # ✅ карточка «Recent duels»: я (кольцо + ⚡) — счёт, исход, упражнение — соперник, для онбординга и Home
         ├── Features/
         │   ├── Onboarding/
-        │   │   ├── OnboardingStep.swift   # ✅ шаги онбординга по порядку макета, значение прогресс-бара для каждого шага
+        │   │   ├── OnboardingStep.swift   # ✅ шаги онбординга по порядку макета (три слайда-объяснения — отдельные шаги), значение прогресс-бара для каждого шага
         │   │   ├── OnboardingTitle.swift  # ✅ двухстрочный заголовок (чёрная + синяя строка)
         │   │   ├── OnboardingProgressHeader.swift  # ✅ «назад» слева + прогресс-бар по центру
         │   │   ├── AvatarEmoji.swift      # ✅ список из 21 эмодзи-мордочки (первая выбрана по умолчанию)
         │   │   ├── OnboardingAvatarCircle.swift # ✅ большой эмодзи-аватар в голубом круге с белым свечением
         │   │   ├── ProfileReadyStepView.swift   # ✅ «Your Profile Is Ready!»: аватар + ник, «Great !» регистрирует профиль (тестовый сервис)
+        │   │   ├── TrainOrChallengeStepView.swift # ✅ слайд-объяснение 1 «Train Solo Or Challenge Friends»: пример рекордов и дуэли с ником и аватаром игрока (цифры — для примера)
+        │   │   ├── CameraAccessStepView.swift # ✅ «Allow Access To Your Camera» → системный запрос; отказ → «Access to the Camera is Restricted» + Open Settings; при возврате проверяет доступ снова
+        │   │   ├── BuildingPathStepView.swift # ✅ слайд-объяснение 2 «Building Your Personal Path»: пункты списка выполняются по очереди (ожидание → загрузка → галочка), затем автопереход дальше
         │   │   ├── MotivationGoal.swift   # ✅ три цели (Get Stronger / Maintain Discipline / Challenge Friends); выбор нигде не сохраняется
         │   │   ├── MotivationStepView.swift # ✅ «What Is Your Main Goal ?»: три синие карточки с иконками из Figma, тап по любой — дальше
         │   │   ├── AvatarStepView.swift   # ✅ выбор аватара: большой превью-кружок + прокручиваемая сетка 3 в ряд, выбор нельзя снять
         │   │   ├── NicknameStepView.swift # ✅ ввод ника: клавиатура сразу, Continue активна с первого символа, проверка ника, ошибка «занят» / «нет сети»
-        │   │   ├── OnboardingFlowView.swift   # ✅ переключение шагов вперёд/назад, общий фон и шапка с прогрессом; шаги без макета — заглушки (DEBUG: `-debugOnboardingStep N`)
+        │   │   ├── OnboardingFlowView.swift   # ✅ переключение шагов вперёд/назад, общий фон и шапка с прогрессом; после регистрации запоминает шаг и ник/эмодзи (UserDefaults), чтобы продолжить после перезапуска (DEBUG: `-debugOnboardingStep N`)
         │   │   ├── IntroSlide.swift   # ✅ содержимое слайдов: картинка в уголках (слайд 1) или отдельная картинка (слайд 2)
         │   │   ├── IntroSlideView.swift   # ✅ слайд: заголовок, подзаголовок, картинка в уголках, карточка подсказок
         │   │   ├── IntroPagerView.swift   # ✅ листание слайдов + точки + Continue (DEBUG: `-debugIntroPage N`)
-        │   │   └── OnboardingPlaceholderStepView.swift  # 🚧 временный экран для шагов без макета
+        │   │   └── OnboardingPlaceholderStepView.swift  # 🚧 временный экран-заглушка (сейчас не используется в потоке)
+        │   ├── Paywall/
+        │   │   ├── PaywallContent.swift   # ✅ содержимое пейвола (тексты, картинка, кнопка); `.onboardingTrial` — пейвол онбординга (цена пока текстом, PROVISIONAL)
+        │   │   ├── PaywallView.swift      # ✅ общий макет пейвола: ✕, заголовок, картинка, «✅ …», описание, кнопка, ссылки Terms · Privacy · Restore
+        │   │   ├── PaywallPurchasing.swift # ✅ протокол покупки / восстановления + тестовый сервис (покупка удаётся, восстанавливать нечего); StoreKit — позже
+        │   │   ├── LegalDocumentView.swift # 🚧 временный экран Terms of Use / Privacy Policy (документов ещё нет)
+        │   │   └── OnboardingPaywallStepView.swift # ✅ пейвол в онбординге: ✕ или покупка → дальше, ссылки и Restore работают
         │   ├── Home/
         │   │   ├── HomeView.swift     # ✅ статистика, график, рекорд + Start training, Recent Duels / Challenge, место в рейтинге (тестовые данные)
         │   │   └── DailyDuelRepsChart.swift  # ✅ столбчатый график «день → повторения в дуэлях» (Swift Charts)
@@ -83,7 +97,7 @@ RepsCounter-Duel/                      # корень git-репозитория
         │   │   └── ProfileView.swift  # ✅ эмодзи, ник, компактная статистика, топ-3 друзей, See all / Add friend (кнопки пока пустые)
         │   └── Duel/
         │       └── DuelSetupPlaceholderView.swift  # 🚧 выбор упражнения и 30/60/90 с; приглашение — этап 4
-        └── Assets.xcassets/           # ✅ AccentColor = #2A8DFD; Onboarding/OnboardingPushup — фигура с отжиманием (фон вырезан), Onboarding/OnboardingSetupPath — иконка-планшет, Onboarding/Goal* — иконки трёх целей; иконка приложения пока пустая
+        └── Assets.xcassets/           # ✅ AccentColor = #2A8DFD; Onboarding/OnboardingPushup — фигура с отжиманием (фон вырезан), Onboarding/OnboardingSetupPath — иконка-планшет, Onboarding/Goal* — иконки трёх целей; Paywall/PaywallTrialHero — телефон на пейволе (экспорт из Figma); Onboarding/CameraAccess* — телефон, карточка системного запроса и экран настроек для шага камеры (@3x); иконка приложения пока пустая
 ```
 
 ## 2. Настройки проекта
@@ -98,6 +112,7 @@ RepsCounter-Duel/                      # корень git-репозитория
 | Минимальная iOS | 18.0 | `IPHONEOS_DEPLOYMENT_TARGET` (проект и таргет) |
 | Устройства | только iPhone | `TARGETED_DEVICE_FAMILY = 1` |
 | Swift | 6, `MainActor` по умолчанию, approachable concurrency | build settings таргета |
+| Камера | `INFOPLIST_KEY_NSCameraUsageDescription` — текст системного запроса доступа | build settings таргета |
 | Тема | только светлая (`INFOPLIST_KEY_UIUserInterfaceStyle = Light`), макет только светлый | build settings таргета |
 | Info.plist | генерируется Xcode (`GENERATE_INFOPLIST_FILE`), ключи — через `INFOPLIST_KEY_*` | build settings таргета |
 | Зависимости | `supabase-swift` 2.55.7 (exact) через локальный пакет | `Packages/RepsCounterKit/Package.swift` |
@@ -113,7 +128,7 @@ RepsCounter-Duel/                      # корень git-репозитория
 | `Backend` | 🚧 | пакет `RepsCounterKit` | модели, правила рейтинга, тестовые данные, фабрика SupabaseClient; репозитории и Realtime — дальше |
 | `CameraService` | 📋 | приложение | захват кадров, разрешения, прерывания, ориентация |
 | `Auth` | 📋 | приложение | анонимная сессия Supabase, привязка ника к ID; после переустановки — новый профиль, восстановления нет |
-| `Onboarding` | 🚧 | `Features/Onboarding` | вводные слайды 1–2, экран ника, выбор аватара, «Profile Is Ready» и выбор цели по макету; остальные шаги — заглушки; регистрация и разрешение камеры — этап 1 |
+| `Onboarding` | ✅ UI | `Features/Onboarding` | все экраны по макету, реальный запрос камеры; ник, регистрация и покупки — тестовые сервисы (сервер — этап 1) |
 | `Profile` | 🚧 | `Features/Profile` | экран на тестовых данных; друзья и переходы — этап 2 |
 | `Home` / `Statistics` | 🚧 | `Features/Home` | экран на тестовых данных; реальные данные — этап 5 |
 | `Training` | 📋 | приложение | одиночная тренировка, обновляет рекорд, хранение в SwiftData |
@@ -124,14 +139,14 @@ RepsCounter-Duel/                      # корень git-репозитория
 ## 4. Ключевые сценарии: где искать код
 
 - **Запуск приложения:** `App/RepsCounter_DuelApp.swift` → `App/RootView.swift` → если онбординг не пройден (`@AppStorage("onboardingCompleted")`) — `OnboardingFlowView`, иначе `MainTabsView`. Сбросить в симуляторе: запуск с аргументом `-onboardingCompleted NO`.
-- **Онбординг:** `OnboardingFlowView` → `IntroPagerView` (слайды `IntroSlide`) → `NicknameStepView` → `NicknameAvailabilityChecking` (сейчас `MockNicknameAvailabilityService`, на этапе 1 — сервер) → `AvatarStepView` (`AvatarEmoji`) → `ProfileReadyStepView` → `ProfileRegistering` (сейчас `MockProfileRegistrationService`; ник заняли за это время → назад на шаг ника) → `MotivationStepView` (`MotivationGoal`) → шаги-заглушки → `onFinish` ставит флаг.
+- **Онбординг:** `OnboardingFlowView` → `IntroPagerView` (слайды `IntroSlide`) → `NicknameStepView` → `NicknameAvailabilityChecking` (сейчас `MockNicknameAvailabilityService`, на этапе 1 — сервер) → `AvatarStepView` (`AvatarEmoji`) → `ProfileReadyStepView` → `ProfileRegistering` (сейчас `MockProfileRegistrationService`; ник заняли за это время → назад на шаг ника) → `MotivationStepView` (`MotivationGoal`) → `TrainOrChallengeStepView` (`RecordsCard`, `RecentDuelCard`) → `BuildingPathStepView` (≈ 5 с анимации, автопереход) → `OnboardingPaywallStepView` → `PaywallView` (`PaywallContent.onboardingTrial`, `MockPaywallPurchaseService`) → `CameraAccessStepView` → `SystemCameraPermission` → доступ есть → `onFinish` ставит флаг и открывает табы.
 - **Нижняя навигация:** `RootView` → `DesignSystem/RCTabBar` (табы из `AppTab`) → кнопка Duel → `Features/Duel/DuelSetupPlaceholderView`.
 - **Данные на экранах:** все экраны берут `Backend/MockData` (параметры по умолчанию во вью) — сервер подключается на этапах 1–5.
 - **Рейтинг:** `RatingView` → `MockData.leaderboard(scope)` → `LeaderboardRanking.rank` (те же правила будут на сервере).
 
 ## 5. Тесты
 
-- Пакет `RepsCounterKit`: Swift Testing, запуск `cd Packages/RepsCounterKit && swift test` (15 тестов: `ExerciseTests`, `LeaderboardRankingTests`, `DuelSummaryTests`, `NicknameAvailabilityTests`, `ProfileRegistrationTests`).
+- Пакет `RepsCounterKit`: Swift Testing, запуск `cd Packages/RepsCounterKit && swift test` (16 тестов: `ExerciseTests`, `LeaderboardRankingTests`, `DuelSummaryTests`, `NicknameAvailabilityTests`, `ProfileRegistrationTests`).
 - Таргета UI-/юнит-тестов в Xcode-проекте пока нет.
 
 ## 6. Бэкенд (Supabase)

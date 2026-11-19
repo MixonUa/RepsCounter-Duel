@@ -52,7 +52,10 @@ struct HomeView: View {
     private var trainingCard: some View {
         VStack(alignment: .leading, spacing: RCSpacing.s) {
             RCSectionHeader("Training record")
-            RCStatTile(value: "\(stats.trainingRecord)", label: "Best reps in one session")
+            HStack {
+                RCStatTile(value: "\(stats.trainingRecord(for: .pushUps))", label: "Push-ups")
+                RCStatTile(value: "\(stats.trainingRecord(for: .squats))", label: "Squats")
+            }
             Button("Start training") {
                 // Training flow arrives in stage 3.
             }

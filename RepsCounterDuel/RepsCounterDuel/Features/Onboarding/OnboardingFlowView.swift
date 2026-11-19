@@ -4,20 +4,28 @@ import DesignSystem
 
 /// First-launch onboarding. The gradient background is painted once here (not per step) so it
 /// does not restart under the progress header.
-/// UI stage: steps without a Figma frame are placeholders;
-/// registration and the real camera permission are wired in stage 1.
+/// UI stage: nickname check, registration and purchases use mock services (stage 1 wires the
+/// server); the camera permission is real.
+///
+/// Once the profile is registered, the current step is remembered: changing the camera permission
+/// in Settings makes iOS terminate the app, and onboarding must resume, not start over.
 struct OnboardingFlowView: View {
     let onFinish: () -> Void
     var nicknameChecker: any NicknameAvailabilityChecking = MockNicknameAvailabilityService()
     var registrar: any ProfileRegistering = MockProfileRegistrationService()
+    var purchases: any PaywallPurchasing = MockPaywallPurchaseService()
+    var cameraPermission: any CameraPermissionProviding = SystemCameraPermission()
 
     @State private var step: OnboardingStep = OnboardingFlowView.initialStep
     @State private var isMovingForward = true
     @State private var introPage = OnboardingFlowView.initialIntroPage
-    @State private var nickname = ""
-    @State private var avatar = AvatarEmoji.default
-    /// Set once the profile is registered on the "Your Profile Is Ready!" step.
-    @State private var registeredProfile: PlayerProfile?
+    @State private var nickname = OnboardingFlowView.savedNickname
+    @State private var avatar = OnboardingFlowView.savedAvatar
+
+    /// UI stage persistence (stage 1 reads the registered profile from the server instead).
+    @AppStorage(StorageKey.resumeStep) private var resumeStep = 0
+    @AppStorage(StorageKey.nickname) private var storedNickname = ""
+    @AppStorage(StorageKey.emoji) private var storedEmoji = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,7 +40,14 @@ struct OnboardingFlowView: View {
             }
             .frame(maxHeight: .infinity)
         }
-        .rcGradientBackground()
+        .background {
+            // The paywall has a plain background in Figma; other steps use the blue gradient.
+            if step == .paywall {
+                RCColor.background.ignoresSafeArea()
+            } else {
+                Color.clear.rcGradientBackground()
+            }
+        }
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
@@ -51,20 +66,25 @@ struct OnboardingFlowView: View {
                 emoji: avatar.emoji,
                 registrar: registrar,
                 onRegistered: { profile in
-                    registeredProfile = profile
+                    storedNickname = profile.nickname
+                    storedEmoji = profile.emoji
                     advance()
                 },
                 onNicknameTaken: { go(to: .nickname) }
             )
         case .motivation:
             MotivationStepView(onSelect: { _ in advance() })
-        case .explanation:
-            OnboardingPlaceholderStepView(title: "How it works", onContinue: advance)
+        case .explanationTrainOrChallenge:
+            TrainOrChallengeStepView(
+                me: PlayerProfile(nickname: nickname.isEmpty ? "Nova_07" : nickname, emoji: avatar.emoji),
+                onContinue: advance
+            )
+        case .explanationBuildingPath:
+            BuildingPathStepView(onFinished: advance)
+        case .paywall:
+            OnboardingPaywallStepView(purchases: purchases, onDone: advance)
         case .cameraPermission:
-            // Stage 1: granted → finish, denied → .cameraTips.
-            OnboardingPlaceholderStepView(title: "Camera access", onContinue: onFinish)
-        case .cameraTips:
-            OnboardingPlaceholderStepView(title: "Camera tips", onContinue: onFinish)
+            CameraAccessStepView(permission: cameraPermission, onGranted: finish)
         }
     }
 
@@ -75,9 +95,8 @@ struct OnboardingFlowView: View {
     }
 
     private func advance() {
-        guard let next = step.next else { return onFinish() }
-        isMovingForward = true
-        withAnimation(.snappy) { step = next }
+        guard let next = step.next else { return finish() }
+        go(to: next)
     }
 
     private func goBack() {
@@ -88,16 +107,36 @@ struct OnboardingFlowView: View {
     private func go(to target: OnboardingStep) {
         isMovingForward = target.rawValue > step.rawValue
         withAnimation(.snappy) { step = target }
+        // Resume point only exists after registration.
+        if !storedNickname.isEmpty, target.rawValue > OnboardingStep.confirmProfile.rawValue {
+            resumeStep = target.rawValue
+        }
     }
 
-    // DEBUG: `-debugOnboardingStep N` opens step N, `-debugIntroPage N` opens intro slide N
-    // (for visual checks in the simulator).
+    private func finish() {
+        resumeStep = 0
+        onFinish()
+    }
+
+    // MARK: - Initial state
+
+    private enum StorageKey {
+        static let resumeStep = "onboardingResumeStep"
+        static let nickname = "onboardingRegisteredNickname"
+        static let emoji = "onboardingRegisteredEmoji"
+    }
+
+    /// DEBUG `-debugOnboardingStep N` wins; otherwise the remembered resume step; otherwise intro.
     private static var initialStep: OnboardingStep {
+        let defaults = UserDefaults.standard
         #if DEBUG
-        OnboardingStep(rawValue: UserDefaults.standard.integer(forKey: "debugOnboardingStep")) ?? .intro
-        #else
-        .intro
+        if defaults.object(forKey: "debugOnboardingStep") != nil,
+           let step = OnboardingStep(rawValue: defaults.integer(forKey: "debugOnboardingStep")) {
+            return step
+        }
         #endif
+        return OnboardingStep(rawValue: defaults.integer(forKey: StorageKey.resumeStep))
+            .flatMap { $0.rawValue > 0 ? $0 : nil } ?? .intro
     }
 
     private static var initialIntroPage: Int {
@@ -106,6 +145,15 @@ struct OnboardingFlowView: View {
         #else
         0
         #endif
+    }
+
+    private static var savedNickname: String {
+        UserDefaults.standard.string(forKey: StorageKey.nickname) ?? ""
+    }
+
+    private static var savedAvatar: AvatarEmoji {
+        let emoji = UserDefaults.standard.string(forKey: StorageKey.emoji)
+        return AvatarEmoji.all.first { $0.emoji == emoji } ?? .default
     }
 }
 

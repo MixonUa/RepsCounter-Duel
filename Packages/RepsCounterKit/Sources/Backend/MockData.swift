@@ -13,7 +13,10 @@ public enum MockData {
         PlayerProfile(nickname: "kate", emoji: "🐼"),
     ]
 
-    public static let myStats = PlayerStats(totalDuelReps: 412, duelsWon: 9, duelsLost: 5, duelsTied: 1, trainingRecord: 38)
+    public static let myStats = PlayerStats(
+        totalDuelReps: 412, duelsWon: 9, duelsLost: 5, duelsTied: 1,
+        trainingRecords: [.pushUps: 74, .squats: 82]
+    )
 
     /// Last 7 days, oldest first.
     public static let dailyDuelReps: [DailyDuelReps] = {

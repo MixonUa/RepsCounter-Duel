@@ -13,7 +13,7 @@
 - Profile = unique nickname + an **emoji icon** chosen by the user. **No photo upload** of any kind.
 - Main navigation: **Home**, **Rating**, **Profile**, plus a visually separate **Duel** action at the right edge / outside the main body of the bottom bar. Exact layout and accessibility interaction must be validated against Figma.
 - **Home**: extended player statistics, a chart of **duel repetitions per day** (date → total accepted duel reps that day), the training record, a **Start training** button, a **Recent Duels** block (last duel result, or a **Challenge to a duel** button when there are none) and the player's **current rating place**. **Profile**: emoji icon, nickname, compact player statistics and a short list of **friends' results** (top 3); **See all** opens the full friends list, **Add friend** opens friend search; with no friends only an **Add friend** button is shown.
-- **Training record**: a separate field holding the best result achieved in training. Training never feeds the daily duel chart or rankings.
+- **Training record**: the best result achieved in training, **stored per exercise** (squats and push-ups separately; decided 2026-11-19). Screens show either the per-exercise records or their **sum**, as the design requires (e.g. the onboarding "Your records" card shows both exercises). Training never feeds the daily duel chart or rankings.
 - Exercises: **squats** and **push-ups**.
 - **Training** mode: individual camera-based workouts count accepted repetitions and update the personal training record; training repetitions do not contribute to rankings or to the daily duel chart. Training works offline once the user is registered.
 - Camera setup: **portrait** orientation, and **every exercise is filmed from the front** (preferred; feasibility for push-ups must be validated on real devices before it is treated as final).
@@ -33,7 +33,7 @@
 ## 3. Technology and security boundaries
 - UI: SwiftUI, SF Symbols, native accessibility APIs where suitable; support iOS 18 and later. Use iOS 26+ Liquid Glass APIs only within availability-guarded branches, with design-faithful standard SwiftUI/material fallbacks for iOS 18–25. Test both ranges.
 - Camera: AVFoundation; handle permission refusal, camera interruption and device orientation.
-- **Camera permission gates app entry** (Figma requirement, decided 2026-11-19): the last onboarding step requests camera access; if denied, a "camera tips" screen with an **Open Settings** button is shown, and the user reaches Home only after access is granted (also re-check when access is revoked later). Risk to recheck before App Store submission: Guideline 5.1.1 (forcing permissions).
+- **Camera permission gates app entry** (Figma requirement, decided 2026-11-19): the last onboarding step ("Allow Access To Your Camera") shows the system alert on Continue; if denied, the same screen switches to "Access to the Camera is Restricted" with **Open Settings**, and the user reaches Home only after access is granted (also re-check when access is revoked later). iOS terminates the app when the permission changes in Settings, so onboarding **resumes at the saved step** after registration instead of starting over. Camera usage description: "Reps Counter uses the camera to count your squats and push-ups. Video is processed on your iPhone and is never uploaded." Risk to recheck before App Store submission: Guideline 5.1.1 (forcing permissions).
 - Body landmarks: Apple Vision, starting with a tested 2D pipeline; evaluate 3D only if it measurably helps.
 - Pose processing happens **on-device**. Do not upload raw video or frames by default; an eventual evidence/anti-cheat flow requires a separate privacy and product decision.
 - Backend: **Supabase is the selected architecture direction** for Auth, PostgreSQL, Realtime, Storage and server-side functions. Before implementation verify current SDK/API compatibility, configuration and operating costs; do not claim it has already been provisioned.
@@ -128,7 +128,7 @@ States: `invited -> joined -> calibrating -> ready -> countdown -> live -> final
 ## 7. Leaderboard and statistics invariants
 - Maintain immutable/finalized duel result records as the audit source; derive leaderboard totals from eligible completed duel results or maintain a server-updated aggregate with idempotent transactions.
 - `totalDuelReps = completedRankedSquatReps + completedRankedPushupReps` for each player — the only leaderboard and statistics total shown in the UI. Per-exercise reps may be kept in duel records (each duel has one exercise) but are not displayed or ranked separately.
-- Distinguish `trainingRecord`, `duelReps`, `duelsWon`, `duelsLost`, `duelsTied`, and **daily duel reps** (per calendar day, the sum of accepted reps from finalized duels — the source of the Home chart); do not combine training with leaderboard totals or the daily chart.
+- Distinguish `trainingRecords` (per exercise; the total is their sum), `duelReps`, `duelsWon`, `duelsLost`, `duelsTied`, and **daily duel reps** (per calendar day, the sum of accepted reps from finalized duels — the source of the Home chart); do not combine training with leaderboard totals or the daily chart.
 - Friends leaderboards use the same totals and ranking rules as global ones, limited to the player and their accepted friends.
 - If two players have equal leaderboard totals, show the **same displayed rank**; use a stable secondary sort such as public username and account ID for deterministic pagination, never represent that sort as a sporting tiebreaker.
 - Return deterministic ordering and paginate leaderboard results.
@@ -148,7 +148,8 @@ States: `invited -> joined -> calibrating -> ready -> countdown -> live -> final
 - UI text is **English only**. Sound and haptic preferences remain open decisions.
 
 ### 8.1 Screen inventory from Figma (described by the user 2026-11-19; Figma MCP access still pending)
-- **Onboarding, in order:** 2 intro slides → nickname registration → emoji choice → confirm nickname + emoji (server registration) → motivation choice (3 buttons; engagement only, not stored on the server and does not affect app logic) → 3 explanation slides → camera permission → Home, or the "camera tips" screen with **Open Settings** until permission is granted.
+- **Onboarding, in order:** 2 intro slides → nickname registration → emoji choice → confirm nickname + emoji (server registration) → motivation choice (3 buttons; engagement only, not stored on the server and does not affect app logic) → 2 explanation slides ("Train Solo Or Challenge Friends", animated "Building Your Personal Path") → **paywall** → camera permission → Home, or the "camera tips" screen with **Open Settings** until permission is granted.
+- **Paywall** (in Figma, added 2026-11-19): "Train Smarter / Free for 3 Days", 3-day free trial then $6.99/week, **Start for $0.00**, ✕ to skip, footer **Terms of Use · Privacy Policy · Restore**. Built as a reusable layout (`PaywallView` + `PaywallContent`) so other paywalls reuse it. Current behaviour is UI-only with a mock purchase service; ✕ and a started trial both continue onboarding.
 - **Tab bar:** Home, Rating, Profile + a separate Duel button on the right.
 - Not yet designed (decide later; build as labelled provisional states): incoming duel invitation for the invitee, nickname-taken / offline errors, duel reconnect / interrupted / under-review states, unfriend/block, training-record definition.
 
@@ -181,11 +182,12 @@ States: `invited -> joined -> calibrating -> ready -> countdown -> live -> final
 - No additional duel tie-break: a duel with equal accepted reps is a draw; equal leaderboard totals share the same displayed rank.
 - Repeat-match anti-abuse thresholds, evidence retention, moderation/appeals and when a result may be reinstated.
 - Nickname rules: allowed characters and length, whether a nickname can ever be changed, reserved/offensive nickname filtering. Emoji icon: free choice from the system emoji keyboard or a fixed set (check Figma).
-- **Training record definition**: best reps in one training session — per exercise or a single value, and does it depend on the chosen duration?
+- **Training record definition**: best reps in one training session, per exercise (decided). Still open: does it depend on the chosen duration?
 - Daily duel chart: time zone of a "day" (proposed: the user's local calendar day) and the range shown (check Figma).
 - Rating period: all-time totals are assumed unless a period/season is decided.
 - Retention/cleanup of profiles abandoned after reinstall (they still appear in friends lists and rankings).
 - Whether match sound, haptics and countdown voice prompts are optional.
+- **Monetization (open):** which features the subscription unlocks (and what a user who closes the paywall can do), final price/trial/products, where else paywalls appear, Terms of Use and Privacy Policy URLs. Before release: StoreKit 2 products in App Store Connect (paid Apple Developer Program), localized price taken from StoreKit (never hard-coded copy), working Restore, and App Review guideline 3.1.2 subscription disclosures.
 
 ## 12. Product invariants and safeguards
 - In-app invitation **from the friends list** is the only approved opponent discovery mechanism. Every accepted duel is **ranked**, with host choice of 30, 60 or 90 seconds; there is no friendly switch.

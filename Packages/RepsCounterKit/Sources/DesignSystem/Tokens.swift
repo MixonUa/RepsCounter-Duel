@@ -72,7 +72,16 @@ public enum RCColor {
     public static let goalCardBottom = Color(rgb: 0x0237B3)
     /// FIGMA: light rim around the icon circle on a goal card.
     public static let goalIconRim = Color(rgb: 0xCFD8F3)
-    public static let win = Color.green
+    /// FIGMA: thin divider inside white cards.
+    public static let cardDivider = Color(rgb: 0xE0E0E0)
+    /// FIGMA: pending / in-progress status circle in a checklist and its number.
+    public static let statusPendingFill = Color(rgb: 0xF2F2F2)
+    public static let statusPendingText = Color(rgb: 0x8B8B8B)
+    /// FIGMA: large bolt illustration gradient, top → bottom.
+    public static let boltTop = Color(rgb: 0x56C1FA)
+    public static let boltBottom = Color(rgb: 0x0E65EE)
+    /// FIGMA: "Win" / "+4 this week" green.
+    public static let win = Color(rgb: 0x36BF5A)
     public static let loss = Color.red
     public static let draw = Color.orange
 }
@@ -93,6 +102,8 @@ public enum RCFont {
     /// FIGMA: inline error under a field.
     public static let fieldError = Font.subheadline
     public static let tip = Font.callout.weight(.semibold)
+    /// FIGMA: section heading above a card ("Your records", "Recent duels").
+    public static let cardHeading = Font.system(size: 23, weight: .bold)
     /// FIGMA: large primary button label.
     public static let buttonLarge = Font.title2.weight(.semibold)
     /// Distance-readable live counter for training / duel screens.
