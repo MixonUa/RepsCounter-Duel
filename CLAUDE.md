@@ -87,7 +87,8 @@ Keep these independently testable; adapt to the actual repository, and avoid a g
 - Unit-test accepted reps, rejected/partial reps, noisy landmarks, left/right side handling, camera dropout, recovery, repeated events and end-of-timer boundary cases using recorded or synthetic pose sequences.
 - Do not imply medical-grade assessment or certify perfect exercise form based on a single camera.
 
-### 5.1 Current implementation (2026-11-20; thresholds provisional, not validated on devices)
+### 5.1 Current implementation (2026-11-20; thresholds provisional)
+- First real-device check (2026-11-20, one tester, front camera): squats and push-ups training and a two-device duel counted correctly. Still needed before claiming accuracy: diverse testers, devices, lighting, distances and recorded sequences (§5).
 - `ExerciseAnalyzer` (pure, `swift test`): each exercise is reduced to one scale-free extension signal measured from the front — squats: (kneeY − hipY) / (ankleY − kneeY), push-ups: (wristY − shoulderY) / shoulder width; both sides averaged, one visible side is enough. `RepCounter` calibrates on a held start position, then runs `ready → descending → bottomReached → ascending → rep` with smoothing, hysteresis, min/max rep duration and tracking-loss cancellation; thresholds are fractions of the player's own baseline (`RepCounterConfiguration`, all PROVISIONAL). Elbow-angle and body-alignment checks for push-ups are not used yet (unreliable from the front until validated).
 - `PoseDetection`: Apple Vision 2D body pose on upright mirrored frames from the front camera.
 - App: `WorkoutTracker` runs detection + counting on the camera's video queue; a rep scores only if its whole cycle lies in the scoring window (after the countdown; before the duel ends). The skeleton and provisional hints ("Full body not visible", "Move back", "Hold the start position", "Go lower to count the rep") are drawn over the camera.
