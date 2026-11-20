@@ -57,7 +57,7 @@
 - Module packaging: **hybrid** — one local Swift package with targets `DesignSystem`, `PoseDetection`/`ExerciseAnalyzer` and `Backend` (pure logic testable via `swift test`), and feature modules (Home, Training, Duel, Ranking, …) as folders in the app target.
 - Backend client: official **`supabase-swift`** with a pinned version; verify current version and iOS 18 compatibility before adding.
 - Training data: **SwiftData** locally with background sync to Supabase (training record), so training works offline after registration.
-- Supabase: only a **`dev`** project (free tier) for now; `prod` is created before beta. Create projects, apply migrations or change data **only on an explicit user command**.
+- Supabase: only a **`dev`** project (free tier) for now — `reps-counter-dev`, ref `kreicqgbbrxeerzquiue`, eu-central-1, created 2026-11-20; `prod` is created before beta. Create projects, apply migrations or change data **only on an explicit user command**. Migrations are versioned in `supabase/migrations/` (applied to dev via the Supabase MCP). The client holds only the project URL and the public anon key (`App/AppServices.swift`). **Anonymous sign-ins must be enabled** in the dashboard (Authentication → Sign In / Providers); its IP rate limit (default 30/h) is the MVP registration rate limit, CAPTCHA before public launch.
 
 ## 4. Suggested module boundaries
 Keep these independently testable; adapt to the actual repository, and avoid a giant view model:
@@ -196,7 +196,7 @@ States: `invited -> joined -> calibrating -> ready -> countdown -> live -> final
 - **Connection and match policies are proposed MVP defaults** (10-second reconnect grace, disputed/abandoned matches yield zero leaderboard credit, no timer pause); get explicit approval before treating them as business rules for production.
 - No additional duel tie-break: a duel with equal accepted reps is a draw; equal leaderboard totals share the same displayed rank.
 - Repeat-match anti-abuse thresholds, evidence retention, moderation/appeals and when a result may be reinstated.
-- Nickname rules: allowed characters and length, how often a nickname may be changed, reserved/offensive nickname filtering. Emoji icon: free choice from the system emoji keyboard or a fixed set (check Figma).
+- Nickname rules: **decided 2026-11-20 — 3–20 Latin letters, digits, `_` or `.`**, unique case-insensitively (server check constraint + citext unique index; client `NicknameRules.isValid`). Still open: how often a nickname may be changed, reserved/offensive nickname filtering. Emoji icon: free choice from the system emoji keyboard or a fixed set (check Figma).
 - **Training record definition**: best reps in one training session, per exercise (decided). Still open: does it depend on the chosen duration?
 - Daily duel chart: time zone of a "day" (proposed: the user's local calendar day) and the range shown (check Figma).
 - Rating period details: the weekly rating resets at **Monday 00:00 UTC** for everyone (decided 2026-11-19; the Home daily chart still uses the user's local day). Still open: whether past weeks/all-time totals are shown anywhere, and the "top N" milestones (1/2/3/5/10/20/…).
