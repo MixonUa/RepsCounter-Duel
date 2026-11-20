@@ -65,6 +65,7 @@ struct TrainingSessionView: View {
         .animation(.snappy, value: phase)
         .sensoryFeedback(.impact(weight: .heavy), trigger: phase)
         .sensoryFeedback(.increase, trigger: reps)
+        .onChange(of: reps) { old, new in if new > old { RepSound.play() } }
         .animation(.snappy, value: tracker.feedback)
         .onAppear { tracker.start() }
         .onDisappear { tracker.stop() }

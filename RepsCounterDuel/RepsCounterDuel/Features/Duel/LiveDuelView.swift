@@ -86,7 +86,10 @@ struct LiveDuelView: View {
         .persistentSystemOverlays(.hidden)
         .animation(.snappy, value: phase)
         .task { await run() }
-        .onChange(of: tracker.reps) { Task { await sendPendingReps() } }
+        .onChange(of: tracker.reps) { old, new in
+            if new > old { RepSound.play() }
+            Task { await sendPendingReps() }
+        }
         .overlay(alignment: .top) {
             if isReconnecting {
                 // PROVISIONAL (no Figma frame): prominent reconnection banner (CLAUDE.md §6).
