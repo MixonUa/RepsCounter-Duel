@@ -1,10 +1,13 @@
 import SwiftUI
+import OSLog
 import Backend
 
 /// Incoming friend requests for the whole tab area (CLAUDE.md §6 "Incoming friend request UI"):
 /// a new request opens the modal; closing it (✕ or swipe) leaves a banner pinned on top of every
-/// tab until the request is accepted or rejected. Stage 2 fills `requests` from the server
-/// (pending `friend_requests` + realtime); until then nothing creates requests in the app.
+/// tab until the request is accepted or rejected.
+/// Requests come from the server (`incoming_friend_requests`), fetched when the app becomes active
+/// and every `pollInterval` while it stays active. PROVISIONAL: polling instead of realtime (the
+/// server hides account IDs, realtime arrives with duel invitations in stage 4).
 @Observable
 final class FriendRequestCenter {
     private(set) var requests: [PlayerProfile] = []
@@ -12,10 +15,15 @@ final class FriendRequestCenter {
     var modalRequest: PlayerProfile?
     private(set) var respondingTo: PlayerProfile.ID?
     var errorMessage: String?
+    /// Called after I accepted a request (my friends list changed).
+    @ObservationIgnored var onFriendsChanged: () -> Void = {}
 
-    private let service: any FriendsServicing
+    @ObservationIgnored private let service: any FriendsServicing
+    /// Requests already shown as a modal (a closed modal is not reopened, the banner stays).
+    @ObservationIgnored private var shownRequests: Set<PlayerProfile.ID> = []
+    static let pollInterval: Duration = .seconds(20)
 
-    init(service: any FriendsServicing = MockFriendsService()) {
+    init(service: any FriendsServicing = AppServices.friendsService) {
         self.service = service
     }
 
@@ -24,10 +32,32 @@ final class FriendRequestCenter {
         modalRequest == nil ? requests.first : nil
     }
 
-    func receive(from player: PlayerProfile) {
-        guard !requests.contains(where: { $0.nickname.lowercased() == player.nickname.lowercased() }) else { return }
-        requests.append(player)
-        if modalRequest == nil { modalRequest = player }
+    /// Fetches now and then every `pollInterval` until the task is cancelled (app inactive).
+    func keepUpdated() async {
+        while !Task.isCancelled {
+            await refresh()
+            try? await Task.sleep(for: Self.pollInterval)
+        }
+    }
+
+    func refresh() async {
+        guard respondingTo == nil else { return }
+        do {
+            apply(try await service.fetchIncomingRequests())
+        } catch {
+            AppLog.backend.error("Loading friend requests failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    private func apply(_ incoming: [PlayerProfile]) {
+        withAnimation(.snappy) {
+            requests = incoming
+            if let modal = modalRequest, !incoming.contains(modal) { modalRequest = nil }
+            if modalRequest == nil, let new = incoming.first(where: { !shownRequests.contains($0.id) }) {
+                modalRequest = new
+            }
+        }
+        shownRequests.formUnion(incoming.map(\.id))
     }
 
     func respond(to player: PlayerProfile, accept: Bool) {
@@ -41,7 +71,9 @@ final class FriendRequestCenter {
                     requests.removeAll { $0.id == player.id }
                     if modalRequest?.id == player.id { modalRequest = nil }
                 }
+                if accept { onFriendsChanged() }
             } catch {
+                AppLog.backend.error("Answering a friend request failed: \(String(describing: error), privacy: .public)")
                 // PROVISIONAL copy: no Figma frame for this error.
                 errorMessage = "Couldn't answer the request. Check your internet connection and try again."
             }

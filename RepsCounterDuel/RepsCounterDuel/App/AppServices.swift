@@ -23,6 +23,10 @@ enum AppServices {
         usesMocks ? MockProfileRegistrationService() : SupabaseProfileService(backend: backend)
     }
 
+    static var friendsService: any FriendsServicing {
+        usesMocks ? MockFriendsService() : SupabaseFriendsService(backend: backend)
+    }
+
     static var profileUpdater: any ProfileUpdating {
         usesMocks ? MockProfileUpdateService() : SupabaseProfileService(backend: backend)
     }

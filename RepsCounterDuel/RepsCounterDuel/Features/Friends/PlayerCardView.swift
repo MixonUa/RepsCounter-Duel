@@ -11,16 +11,20 @@ struct PlayerCardView: View {
     let card: PlayerCard
     let service: any FriendsServicing
     let onSeeAllFriends: () -> Void
+    /// Called after my request / acceptance went through (refreshes my friends list).
+    var onRelationshipChanged: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
     @State private var relationship: PlayerCard.Relationship
     @State private var isSending = false
     @State private var isErrorPresented = false
+    @State private var errorMessage = ""
 
-    init(card: PlayerCard, service: any FriendsServicing, onSeeAllFriends: @escaping () -> Void) {
+    init(card: PlayerCard, service: any FriendsServicing, onSeeAllFriends: @escaping () -> Void, onRelationshipChanged: @escaping () -> Void = {}) {
         self.card = card
         self.service = service
         self.onSeeAllFriends = onSeeAllFriends
+        self.onRelationshipChanged = onRelationshipChanged
         _relationship = State(initialValue: card.relationship)
     }
 
@@ -60,7 +64,7 @@ struct PlayerCardView: View {
         .alert("Couldn't send the request", isPresented: $isErrorPresented) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Check your internet connection and try again.")
+            Text(errorMessage)
         }
     }
 
@@ -131,26 +135,38 @@ struct PlayerCardView: View {
                 ProgressView().tint(.white)
             } else {
                 switch relationship {
-                case .none: Text("+ Add Friend")
+                case .none, .requestReceived: Text("+ Add Friend")
                 case .requestSent: Text("Request Sent")
                 case .friends: Label("Friends", systemImage: "checkmark")
                 }
             }
         }
         .buttonStyle(.rcPrimaryLarge)
-        .disabled(relationship != .none || isSending)
+        .disabled(!canSend || isSending)
         .padding(.horizontal, RCSpacing.xl)
         .padding(.bottom, RCSpacing.xxs)
     }
 
+    private var canSend: Bool { relationship == .none || relationship == .requestReceived }
+
+    /// "+ Add Friend": sends a request, or accepts theirs when they had already asked me.
     private func sendRequest() {
-        guard relationship == .none, !isSending else { return }
+        guard canSend, !isSending else { return }
         isSending = true
         Task {
             do {
-                try await service.sendFriendRequest(to: card.profile)
-                withAnimation(.snappy) { relationship = .requestSent }
+                let result = try await service.sendFriendRequest(to: card.profile)
+                withAnimation(.snappy) {
+                    relationship = switch result {
+                    case .sent, .alreadySent: .requestSent
+                    case .accepted, .alreadyFriends: .friends
+                    }
+                }
+                onRelationshipChanged()
             } catch {
+                errorMessage = (error as? FriendsError) == .rateLimited
+                    ? "You've sent too many requests today. Try again tomorrow."
+                    : "Check your internet connection and try again."
                 isErrorPresented = true
             }
             isSending = false

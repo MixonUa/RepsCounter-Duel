@@ -48,6 +48,8 @@ struct MainTabsView: View {
 
     @State private var isTabBarHidden = false
     @State private var friendRequests = FriendRequestCenter()
+    @State private var friendsStore = FriendsStore()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var duelInvitations = DuelInvitationCenter()
 
     /// Mock data until stages 2–5: a new player sees the empty states.
@@ -70,8 +72,19 @@ struct MainTabsView: View {
         return overview
     }
 
+    /// Friends are real (server); stats, weekly place and Top Friends' weekly numbers come with
+    /// duels (stage 5). Until then Top Friends lists my newest friends without numbers.
     private var profileOverview: ProfileOverview {
-        showsFilledData ? MockData.profileFilled : MockData.profileEmpty
+        if showsFilledData { return MockData.profileFilled }
+        let friends = friendsStore.friends
+        return ProfileOverview(
+            stats: .empty,
+            weeklyRank: nil,
+            topFriends: friends.filter { $0.status == .friend }.prefix(3).map {
+                TopFriend(profile: $0.profile, winRate: nil, jointReps: 0)
+            },
+            friends: friends
+        )
     }
 
     /// FIGMA: the bar (66 pt) floats 22 pt above the physical screen edge — partly inside the
@@ -123,6 +136,14 @@ struct MainTabsView: View {
         }
         .environment(friendRequests)
         .environment(duelInvitations)
+        .environment(friendsStore)
+        // Incoming requests and my friends: fetched while the app is active.
+        .task(id: scenePhase == .active) {
+            guard scenePhase == .active else { return }
+            friendRequests.onFriendsChanged = { [friendsStore] in Task { await friendsStore.refresh() } }
+            await friendsStore.refresh()
+            await friendRequests.keepUpdated()
+        }
         .task { receiveDebugInvitation() }
         .sheet(item: $duelInvitations.modalInvitation, onDismiss: duelInvitations.modalDidDismiss) { invitation in
             DuelInvitationSheet(invitation: invitation)
@@ -170,8 +191,11 @@ struct MainTabsView: View {
                 friends: profileOverview.friends,
                 myStats: profileOverview.stats,
                 onDuelAccepted: { lobbyAfterSheet = $0 },
-                onTrainingStart: { trainingAfterSheet = $0 }
+                onTrainingStart: { trainingAfterSheet = $0 },
+                friendsService: friendsStore.service,
+                onFriendsChanged: { Task { await friendsStore.refresh() } }
             )
+            .task { await friendsStore.refresh() }
         }
     }
 

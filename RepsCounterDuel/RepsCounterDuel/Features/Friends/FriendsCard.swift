@@ -125,7 +125,8 @@ struct FriendsCard: View {
 }
 
 extension PlayerCard {
-    /// UI stage: a friend's player card from the mock search data (stage 2 loads it from the server).
+    /// Fallback card when the server one can't be loaded (mock data in `-debugDataState filled`,
+    /// otherwise just the nickname and emoji from the list).
     static func mock(for item: FriendListItem) -> PlayerCard {
         MockData.searchablePlayers.first { $0.profile.nickname.lowercased() == item.profile.nickname.lowercased() }
             ?? PlayerCard(profile: item.profile, stats: .empty, weeklyRank: item.weeklyRank, friends: [], relationship: .friends)

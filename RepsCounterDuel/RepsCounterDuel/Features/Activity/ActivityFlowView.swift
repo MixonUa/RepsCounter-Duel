@@ -32,7 +32,7 @@ enum ActivityFlowStart: Hashable, Identifiable {
 struct ActivityFlowView: View {
     let start: ActivityFlowStart
     let me: PlayerProfile
-    /// My friends and sent requests (UI stage: the Profile mock data).
+    /// My friends and sent requests (from the server via `FriendsStore`).
     let friends: [FriendListItem]
     /// My stats for the lobby's HEAD TO HEAD.
     var myStats: PlayerStats = .empty
@@ -40,7 +40,9 @@ struct ActivityFlowView: View {
     var onDuelAccepted: (DuelLobby) -> Void = { _ in }
     /// Training exercise chosen: the sheet closes and the full-screen training opens.
     var onTrainingStart: (Exercise) -> Void = { _ in }
-    var friendsService: any FriendsServicing = MockFriendsService()
+    var friendsService: any FriendsServicing = AppServices.friendsService
+    /// My friends changed here (request sent / accepted from a player card).
+    var onFriendsChanged: () -> Void = {}
 
     private enum Route: Hashable {
         case chooseExercise(ActivityMode)
@@ -84,13 +86,22 @@ struct ActivityFlowView: View {
                             dismiss()
                         })
                     case .player(let card):
-                        PlayerCardView(card: card, service: friendsService, onSeeAllFriends: { path.append(.playerFriends(card)) })
+                        PlayerCardView(
+                            card: card,
+                            service: friendsService,
+                            onSeeAllFriends: { path.append(.playerFriends(card)) },
+                            onRelationshipChanged: onFriendsChanged
+                        )
                     case .playerFriends(let card):
-                        FriendsListView(
-                            title: "\(card.profile.nickname)'s Friends",
-                            friends: card.allFriends,
-                            onOpenFriend: { path.append(.player(.mock(for: $0))) },
-                            onAddFriend: nil
+                        PlayerFriendsListView(
+                            player: card.profile,
+                            service: friendsService,
+                            onOpenFriend: { item in
+                                Task {
+                                    let card = (try? await friendsService.findPlayer(nickname: item.profile.nickname)) ?? .mock(for: item)
+                                    path.append(.player(card))
+                                }
+                            }
                         )
                     }
                 }

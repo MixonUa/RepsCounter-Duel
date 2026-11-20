@@ -4,7 +4,8 @@ import DesignSystem
 
 /// FIGMA Profile: blue header with the emoji avatar, Edit and Settings buttons, nickname with a
 /// copy button and the weekly place ("Top 11"); stats card (Duels Won, Win Rate, Total Reps);
-/// Top Friends of the week with "see all" → Friends. Data is mock until stages 2 and 5.
+/// Top Friends of the week with "see all" → Friends. Friends come from the server (stage 2);
+/// stats and weekly places are empty until duels exist (stage 5).
 struct ProfileView: View {
     let me: PlayerProfile
     let overview: ProfileOverview
@@ -21,7 +22,8 @@ struct ProfileView: View {
         var id: String { rawValue }
     }
 
-    var friendsService: any FriendsServicing = MockFriendsService()
+    @Environment(FriendsStore.self) private var friendsStore
+    private var friendsService: any FriendsServicing { friendsStore.service }
 
     @State private var screen: Screen?
     @State private var path: [Route] = []
@@ -41,6 +43,8 @@ struct ProfileView: View {
                 .padding(.bottom, RCSpacing.l)
             }
             .scrollIndicators(.hidden)
+            .refreshable { await friendsStore.refresh() }
+            .task { await friendsStore.refresh() }
             .background(alignment: .top) { headerBackground }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Route.self) { route in
@@ -48,21 +52,21 @@ struct ProfileView: View {
                 case .friends:
                     FriendsListView(
                         friends: overview.friends,
-                        onOpenFriend: { path.append(.player(Self.card(for: $0))) },
+                        onOpenFriend: openPlayer,
                         onAddFriend: { isAddFriendPresented = true }
                     )
                 case .player(let card):
                     PlayerCardView(
                         card: card,
                         service: friendsService,
-                        onSeeAllFriends: { path.append(.playerFriends(card)) }
+                        onSeeAllFriends: { path.append(.playerFriends(card)) },
+                        onRelationshipChanged: { Task { await friendsStore.refresh() } }
                     )
                 case .playerFriends(let card):
-                    FriendsListView(
-                        title: "\(card.profile.nickname)'s Friends",
-                        friends: card.allFriends,
-                        onOpenFriend: { path.append(.player(Self.card(for: $0))) },
-                        onAddFriend: nil
+                    PlayerFriendsListView(
+                        player: card.profile,
+                        service: friendsService,
+                        onOpenFriend: openPlayer
                     )
                 }
             }
@@ -98,7 +102,13 @@ struct ProfileView: View {
     }
 
     /// Card for a friend row: the mock search data when known, otherwise a minimal card.
-    private static func card(for item: FriendListItem) -> PlayerCard { .mock(for: item) }
+    /// Loads the friend's card from the server; falls back to the list data when it can't.
+    private func openPlayer(_ item: FriendListItem) {
+        Task {
+            let card = (try? await friendsService.findPlayer(nickname: item.profile.nickname)) ?? .mock(for: item)
+            path.append(.player(card))
+        }
+    }
 
     // MARK: - Stats
 
@@ -190,7 +200,7 @@ private struct TopFriendRow: View {
                         .font(.system(size: 17, weight: .semibold))
                         .tracking(-0.4)
                         .lineLimit(1)
-                    Text("\(friend.winRate.formatted(.percent.precision(.fractionLength(0)))) win rate")
+                    Text(friend.winRate.map { "\($0.formatted(.percent.precision(.fractionLength(0)))) win rate" } ?? "No duels yet")
                         .font(.system(size: 14))
                         .foregroundStyle(RCColor.textSecondary)
                 }
@@ -220,8 +230,10 @@ private struct TopFriendRow: View {
 
 #Preview("Filled") {
     ProfileView(me: PlayerProfile(nickname: "Nova_07", emoji: "🐧"), overview: MockData.profileFilled)
+        .environment(FriendsStore(service: MockFriendsService()))
 }
 
 #Preview("Empty") {
     ProfileView(me: PlayerProfile(nickname: "Nova_07", emoji: "🐧"), overview: MockData.profileEmpty)
+        .environment(FriendsStore(service: MockFriendsService()))
 }
