@@ -12,7 +12,6 @@ public protocol NicknameAvailabilityChecking: Sendable {
 
 public enum NicknameRules {
     /// Value sent to the server: surrounding whitespace removed.
-    /// Allowed characters and length are still an open decision (CLAUDE.md §11).
     public static func normalized(_ nickname: String) -> String {
         nickname.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -21,6 +20,23 @@ public enum NicknameRules {
     public static func canSubmit(_ nickname: String) -> Bool {
         !normalized(nickname).isEmpty
     }
+
+    /// Decided 2026-11-20 (also enforced by the server's `profiles_nickname_format` check):
+    /// 3–20 Latin letters, digits, underscore or dot.
+    public static let minLength = 3
+    public static let maxLength = 20
+
+    public static func isValid(_ nickname: String) -> Bool {
+        let value = normalized(nickname)
+        guard (minLength...maxLength).contains(value.count) else { return false }
+        return value.unicodeScalars.allSatisfy { scalar in
+            scalar.isASCII && (CharacterSet.alphanumerics.contains(scalar) || scalar == "_" || scalar == ".")
+        }
+    }
+
+    /// PROVISIONAL copy (no Figma frame).
+    public static let formatHint = "Use 3–20 letters, digits, _ or ."
+
 }
 
 /// UI-stage stand-in for the server check.

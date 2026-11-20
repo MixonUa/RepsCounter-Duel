@@ -44,3 +44,21 @@ import Testing
         }
     }
 }
+
+@Suite struct NicknameFormatTests {
+    @Test func acceptsTheAgreedCharacterSet() {
+        #expect(NicknameRules.isValid("Nova_07"))
+        #expect(NicknameRules.isValid("lena.v"))
+        #expect(NicknameRules.isValid("  abc  "))
+        #expect(NicknameRules.isValid(String(repeating: "a", count: 20)))
+    }
+
+    @Test func rejectsEverythingElse() {
+        #expect(!NicknameRules.isValid("ab"))
+        #expect(!NicknameRules.isValid(String(repeating: "a", count: 21)))
+        #expect(!NicknameRules.isValid("nova 07"))
+        #expect(!NicknameRules.isValid("nova-07"))
+        #expect(!NicknameRules.isValid("никита"))
+        #expect(!NicknameRules.isValid("nova🐧"))
+    }
+}
