@@ -9,8 +9,9 @@ import ExerciseAnalyzer
 ///   top bar with ✕ and the centered title, bottom panel "REPS", the count and Finish.
 /// PROVISIONAL (not in Figma): ✕ in the setup bar to leave before starting; ✕ leaves without a
 /// result (Finish opens the result); Finish is disabled during the countdown.
-/// UI stage: reps are not counted yet (stage 3; DEBUG: tap the number) and there is no pose
-/// skeleton.
+/// Reps are counted on the device by `WorkoutTracker` (Vision + `RepCounter`) from the end of the
+/// countdown; the skeleton and tracking hints are drawn over the camera. DEBUG: tapping the
+/// number adds a rep (Simulator has no camera).
 struct TrainingSessionView: View {
     let exercise: Exercise
     /// Finish: `reps` is the session's count (the result screen follows).
@@ -25,17 +26,29 @@ struct TrainingSessionView: View {
     }
 
     @State private var phase: Phase = .setup
-    @State private var reps = 0
+    @State private var tracker: WorkoutTracker
+
+    init(exercise: Exercise, onFinish: @escaping (_ reps: Int) -> Void, onClose: @escaping () -> Void) {
+        self.exercise = exercise
+        self.onFinish = onFinish
+        self.onClose = onClose
+        _tracker = State(initialValue: WorkoutTracker(exercise: exercise))
+    }
+
+    private var reps: Int { tracker.reps }
 
     private var isStarted: Bool { phase != .setup }
 
     var body: some View {
         ZStack {
-            CameraPreview()
+            CameraPreview(camera: tracker.camera, state: tracker.cameraState)
+            PoseSkeletonOverlay(pose: tracker.pose, exercise: exercise)
 
             VStack(spacing: 0) {
                 topBar
                 Spacer()
+                PoseFeedbackBadge(feedback: phase == .setup ? nil : tracker.feedback)
+                    .padding(.bottom, RCSpacing.s)
                 bottomPanel
             }
             .padding(.horizontal, isStarted ? 12 : 6)
@@ -51,6 +64,10 @@ struct TrainingSessionView: View {
         .persistentSystemOverlays(.hidden)
         .animation(.snappy, value: phase)
         .sensoryFeedback(.impact(weight: .heavy), trigger: phase)
+        .sensoryFeedback(.increase, trigger: reps)
+        .animation(.snappy, value: tracker.feedback)
+        .onAppear { tracker.start() }
+        .onDisappear { tracker.stop() }
     }
 
     // MARK: - Top bar
@@ -174,13 +191,14 @@ struct TrainingSessionView: View {
                 try? await Task.sleep(for: .seconds(1))
             }
             phase = .active
+            tracker.startScoring()
         }
     }
 
     private func debugAddRep() {
         #if DEBUG
         guard phase == .active else { return }
-        reps += 1
+        tracker.debugAddRep()
         #endif
     }
 }

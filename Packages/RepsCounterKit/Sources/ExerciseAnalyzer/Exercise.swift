@@ -1,4 +1,4 @@
-/// Exercises supported by Reps Counter. Rep-counting state machines are added in stage 3.
+/// Exercises supported by Reps Counter. Reps are counted by `RepCounter`.
 public enum Exercise: String, CaseIterable, Codable, Sendable, Identifiable {
     case squats
     case pushUps = "push_ups"

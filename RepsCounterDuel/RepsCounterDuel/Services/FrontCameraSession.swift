@@ -3,7 +3,8 @@ import AVFoundation
 /// Front camera capture session for the workout / duel screens (CLAUDE.md §3: front camera,
 /// portrait, on-device only — nothing is recorded or uploaded).
 /// Session configuration and start/stop run on a private serial queue, off the main actor.
-/// Stage 3 adds a video data output that feeds Vision pose detection from the same session.
+/// With `frameDelegate` set, upright mirrored frames (as on screen) are delivered on
+/// `videoQueue` for pose detection; late frames are dropped.
 nonisolated final class FrontCameraSession: @unchecked Sendable {
     enum State: Equatable, Sendable {
         case idle
@@ -20,6 +21,10 @@ nonisolated final class FrontCameraSession: @unchecked Sendable {
     private let queue = DispatchQueue(label: "RepsCounter.FrontCameraSession")
     private var isConfigured = false
     private var observers: [NSObjectProtocol] = []
+
+    /// Receives camera frames on `videoQueue` (set before `start()`).
+    var frameDelegate: (any AVCaptureVideoDataOutputSampleBufferDelegate)?
+    let videoQueue = DispatchQueue(label: "RepsCounter.FrontCameraSession.video", qos: .userInitiated)
 
     /// Called on the main actor whenever the state changes.
     var onStateChange: (@MainActor @Sendable (State) -> Void)?
@@ -60,6 +65,23 @@ nonisolated final class FrontCameraSession: @unchecked Sendable {
             return false
         }
         session.addInput(input)
+        if let frameDelegate {
+            let output = AVCaptureVideoDataOutput()
+            output.alwaysDiscardsLateVideoFrames = true
+            output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange]
+            output.setSampleBufferDelegate(frameDelegate, queue: videoQueue)
+            if session.canAddOutput(output) {
+                session.addOutput(output)
+                if let connection = output.connection(with: .video) {
+                    // Portrait and mirrored like the preview, so joints match what the user sees.
+                    if connection.isVideoRotationAngleSupported(90) { connection.videoRotationAngle = 90 }
+                    if connection.isVideoMirroringSupported {
+                        connection.automaticallyAdjustsVideoMirroring = false
+                        connection.isVideoMirrored = true
+                    }
+                }
+            }
+        }
         session.commitConfiguration()
         isConfigured = true
 

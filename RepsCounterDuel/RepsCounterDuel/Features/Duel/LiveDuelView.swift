@@ -8,8 +8,9 @@ import ExerciseAnalyzer
 ///   round "GET READY" counter in the middle, bottom panel "GET IN FRAME".
 /// - Live: top bar with both scores and the time left, the green/red score bar; bottom panel
 ///   "YOUR REPS", "<opponent> is on N" and Give up.
-/// UI stage: no rep counting yet (stage 3) and no pose skeleton; the opponent's reps are mock.
-/// DEBUG: tapping the big number adds one of my reps. Stage 4 takes the start/end times from the
+/// My reps are counted on the device (Vision + `RepCounter`) with the skeleton and tracking hints
+/// over the camera; the opponent's reps are mock until stage 4. DEBUG: tapping the big number adds
+/// one of my reps. Stage 4 takes the start/end times from the
 /// server instead of the device clock.
 struct LiveDuelView: View {
     let lobby: DuelLobby
@@ -19,13 +20,23 @@ struct LiveDuelView: View {
     let onGiveUp: () -> Void
 
     @State private var phase: LiveDuelPhase = .countdown(3)
-    @State private var myReps = 0
+    @State private var tracker: WorkoutTracker
     @State private var opponentReps = 0
+
+    init(lobby: DuelLobby, onFinish: @escaping (_ myReps: Int, _ opponentReps: Int) -> Void, onGiveUp: @escaping () -> Void) {
+        self.lobby = lobby
+        self.onFinish = onFinish
+        self.onGiveUp = onGiveUp
+        _tracker = State(initialValue: WorkoutTracker(exercise: lobby.exercise))
+    }
+
+    private var myReps: Int { tracker.reps }
     @State private var isGiveUpConfirmationPresented = false
 
     var body: some View {
         ZStack {
-            CameraPreview()
+            CameraPreview(camera: tracker.camera, state: tracker.cameraState)
+            PoseSkeletonOverlay(pose: tracker.pose, exercise: lobby.exercise)
 
             VStack(spacing: 0) {
                 DuelScoreBar(
@@ -35,6 +46,8 @@ struct LiveDuelView: View {
                     opponentReps: opponentReps
                 )
                 Spacer()
+                PoseFeedbackBadge(feedback: tracker.feedback)
+                    .padding(.bottom, RCSpacing.s)
                 bottomPanel
             }
             .padding(.horizontal, 6)
@@ -50,6 +63,10 @@ struct LiveDuelView: View {
         .persistentSystemOverlays(.hidden)
         .animation(.snappy, value: phase)
         .task { await run() }
+        .onAppear { tracker.start() }
+        .onDisappear { tracker.stop() }
+        .sensoryFeedback(.increase, trigger: myReps)
+        .animation(.snappy, value: tracker.feedback)
         .sensoryFeedback(.impact(weight: .heavy), trigger: phase)
         .confirmationDialog("Give up the duel?", isPresented: $isGiveUpConfirmationPresented, titleVisibility: .visible) {
             Button("Give up", role: .destructive, action: onGiveUp)
@@ -131,6 +148,8 @@ struct LiveDuelView: View {
         }
         let endsAt = Date.now.addingTimeInterval(TimeInterval(lobby.duration.seconds))
         phase = .live(endsAt: endsAt)
+        // Only full cycles inside the duel window score (device clock; server window in stage 4).
+        tracker.startScoring(duration: TimeInterval(lobby.duration.seconds))
 
         // UI stage: the opponent's reps arrive every few seconds (mock realtime).
         while Date.now < endsAt {
@@ -139,13 +158,14 @@ struct LiveDuelView: View {
             if Date.now < endsAt { opponentReps += 1 }
         }
         phase = .finished
+        tracker.stopScoring()
         onFinish(myReps, opponentReps)
     }
 
     private func debugAddRep() {
         #if DEBUG
         guard case .live = phase else { return }
-        myReps += 1
+        tracker.debugAddRep()
         #endif
     }
 }

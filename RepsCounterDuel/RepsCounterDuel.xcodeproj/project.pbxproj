@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		4D32CBA430ADEAC700AB5280 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 4D32CBA130ADEAC700AB5280 /* DesignSystem */; };
 		4D32CBA530ADEAC700AB5280 /* ExerciseAnalyzer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D32CBA230ADEAC700AB5280 /* ExerciseAnalyzer */; };
+		4D32CBA930ADEAC700AB5280 /* PoseDetection in Frameworks */ = {isa = PBXBuildFile; productRef = 4D32CBA830ADEAC700AB5280 /* PoseDetection */; };
 		4D32CBA630ADEAC700AB5280 /* Backend in Frameworks */ = {isa = PBXBuildFile; productRef = 4D32CBA330ADEAC700AB5280 /* Backend */; };
 /* End PBXBuildFile section */
 
@@ -31,6 +32,7 @@
 			files = (
 				4D32CBA430ADEAC700AB5280 /* DesignSystem in Frameworks */,
 				4D32CBA530ADEAC700AB5280 /* ExerciseAnalyzer in Frameworks */,
+				4D32CBA930ADEAC700AB5280 /* PoseDetection in Frameworks */,
 				4D32CBA630ADEAC700AB5280 /* Backend in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -76,6 +78,7 @@
 			packageProductDependencies = (
 				4D32CBA130ADEAC700AB5280 /* DesignSystem */,
 				4D32CBA230ADEAC700AB5280 /* ExerciseAnalyzer */,
+				4D32CBA830ADEAC700AB5280 /* PoseDetection */,
 				4D32CBA330ADEAC700AB5280 /* Backend */,
 			);
 			productName = RepsCounterDuel;
@@ -379,6 +382,10 @@
 		4D32CBA330ADEAC700AB5280 /* Backend */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Backend;
+		};
+		4D32CBA830ADEAC700AB5280 /* PoseDetection */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PoseDetection;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

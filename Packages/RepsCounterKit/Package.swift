@@ -11,6 +11,7 @@ let package = Package(
     products: [
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "ExerciseAnalyzer", targets: ["ExerciseAnalyzer"]),
+        .library(name: "PoseDetection", targets: ["PoseDetection"]),
         .library(name: "Backend", targets: ["Backend"]),
     ],
     dependencies: [
@@ -20,6 +21,8 @@ let package = Package(
     targets: [
         .target(name: "DesignSystem"),
         .target(name: "ExerciseAnalyzer"),
+        // Apple Vision body pose → ExerciseAnalyzer frames (no third-party dependencies).
+        .target(name: "PoseDetection", dependencies: ["ExerciseAnalyzer"]),
         .target(
             name: "Backend",
             dependencies: [

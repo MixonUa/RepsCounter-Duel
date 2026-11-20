@@ -3,10 +3,11 @@ import AVFoundation
 import DesignSystem
 
 /// Full-screen live front camera (mirrored like a selfie) with a dark fallback when the camera
-/// is unavailable (Simulator), denied or paused. Starts on appear and stops on disappear.
+/// is unavailable (Simulator), denied or paused. The owner (`WorkoutTracker`) starts and stops
+/// the session.
 struct CameraPreview: View {
-    @State private var camera = FrontCameraSession()
-    @State private var state: FrontCameraSession.State = .idle
+    let camera: FrontCameraSession
+    let state: FrontCameraSession.State
 
     var body: some View {
         ZStack {
@@ -26,11 +27,6 @@ struct CameraPreview: View {
             }
         }
         .ignoresSafeArea()
-        .onAppear {
-            camera.onStateChange = { newState in state = newState }
-            camera.start()
-        }
-        .onDisappear { camera.stop() }
     }
 
     /// PROVISIONAL copy (no Figma frames for these states).
