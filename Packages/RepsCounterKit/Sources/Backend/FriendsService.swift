@@ -6,6 +6,8 @@ public struct PlayerCard: Identifiable, Hashable, Sendable {
         case none
         /// My request is pending.
         case requestSent
+        /// They asked me; "+ Add Friend" accepts it.
+        case requestReceived
         case friends
     }
 
@@ -36,14 +38,37 @@ public struct PlayerCard: Identifiable, Hashable, Sendable {
     }
 }
 
-/// Friend search and requests (stage 2: `profiles` lookup by exact case-insensitive nickname and
-/// `friend_requests` through a server function; the server never exposes account IDs).
+/// Outcome of "+ Add Friend".
+public enum FriendRequestResult: Sendable, Equatable {
+    case sent
+    case alreadySent
+    case alreadyFriends
+    /// They had already asked me, so we are friends now.
+    case accepted
+}
+
+public enum FriendsError: Error, Equatable {
+    case playerNotFound
+    case cannotAddSelf
+    /// Too many requests today (server anti-abuse limit).
+    case rateLimited
+}
+
+/// Friend search, requests and lists (stage 2: server RPCs identify players by nickname and
+/// return only nickname / emoji / relationship — account IDs never leave the server).
 public protocol FriendsServicing: Sendable {
     /// Exact, case-insensitive nickname match; nil when nobody has it.
     func findPlayer(nickname: String) async throws -> PlayerCard?
-    func sendFriendRequest(to player: PlayerProfile) async throws
+    @discardableResult
+    func sendFriendRequest(to player: PlayerProfile) async throws -> FriendRequestResult
     /// Accept or decline an incoming request (`friend_requests` pending → accepted | declined).
     func respondToFriendRequest(from player: PlayerProfile, accept: Bool) async throws
+    /// My accepted friends (newest first), then my pending sent requests.
+    func fetchFriends() async throws -> [FriendListItem]
+    /// Requests waiting for my answer, oldest first.
+    func fetchIncomingRequests() async throws -> [PlayerProfile]
+    /// All friends of another player (player card → see all).
+    func fetchFriends(of player: PlayerProfile) async throws -> [FriendListItem]
 }
 
 /// UI-stage stand-in with a few known players. `offline` simulates a network error.
@@ -63,11 +88,20 @@ public struct MockFriendsService: FriendsServicing {
         return players.first { $0.profile.nickname.lowercased() == key }
     }
 
-    public func sendFriendRequest(to player: PlayerProfile) async throws {
+    public func sendFriendRequest(to player: PlayerProfile) async throws -> FriendRequestResult {
         try await Task.sleep(for: delay)
+        return .sent
     }
 
     public func respondToFriendRequest(from player: PlayerProfile, accept: Bool) async throws {
         try await Task.sleep(for: delay)
+    }
+
+    public func fetchFriends() async throws -> [FriendListItem] { [] }
+
+    public func fetchIncomingRequests() async throws -> [PlayerProfile] { [] }
+
+    public func fetchFriends(of player: PlayerProfile) async throws -> [FriendListItem] {
+        players.first { $0.profile.nickname.lowercased() == player.nickname.lowercased() }?.allFriends ?? []
     }
 }

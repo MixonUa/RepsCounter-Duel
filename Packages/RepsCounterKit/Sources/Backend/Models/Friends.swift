@@ -26,14 +26,14 @@ public struct FriendListItem: Identifiable, Hashable, Sendable {
 /// A row of Profile "Top Friends": the best friends of the week, recalculated once a week.
 public struct TopFriend: Identifiable, Hashable, Sendable {
     public let profile: PlayerProfile
-    /// The friend's own win rate ("60% win rate").
-    public let winRate: Double
+    /// The friend's own win rate ("60% win rate"); nil before their first duel.
+    public let winRate: Double?
     /// "joint reps": the friend's combined reps of the week (push-ups + squats from ranked duels).
     public let jointReps: Int
 
     public var id: PlayerProfile.ID { profile.id }
 
-    public init(profile: PlayerProfile, winRate: Double, jointReps: Int) {
+    public init(profile: PlayerProfile, winRate: Double?, jointReps: Int) {
         self.profile = profile
         self.winRate = winRate
         self.jointReps = jointReps

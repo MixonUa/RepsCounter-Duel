@@ -38,3 +38,13 @@ import Testing
         #expect(rating.friends.first { $0.player == me }?.rank == 4)
     }
 }
+
+@Suite struct ServerPlayerIdentityTests {
+    @Test func sameNicknameKeepsTheSameIdentityInAnyCase() {
+        let a = PlayerProfile(serverNickname: "Lena_v", emoji: "🐱")
+        let b = PlayerProfile(serverNickname: "LENA_V", emoji: "🐱")
+        let c = PlayerProfile(serverNickname: "Lena_w", emoji: "🐱")
+        #expect(a.id == b.id)
+        #expect(a.id != c.id)
+    }
+}
