@@ -18,7 +18,7 @@ RepsCounter-Duel/                      # корень git-репозитория
 ├── CLAUDE.md                          # ✅ спецификация продукта и правила разработки (главный источник требований)
 ├── ProjectTree.md                     # ✅ этот файл — карта структуры проекта
 ├── Roadmap.md                         # ✅ поэтапный план разработки и решения по макету
-├── supabase/migrations/               # ✅ SQL-миграции (применены к dev): profiles + RLS + is_nickname_available (+ исправление регистра), друзья (friend_requests, friendships, RPC), фиксированный search_path, дуэли (duels + RPC), рекорды тренировок и статистика игроков, недельный рейтинг и история, пульс и прерванные дуэли, друзья с нулём в Friends
+├── supabase/migrations/               # ✅ SQL-миграции (применены к dev): profiles + RLS + is_nickname_available (+ исправление регистра), друзья (friend_requests, friendships, RPC), фиксированный search_path, дуэли (duels + RPC), рекорды тренировок и статистика игроков, недельный рейтинг и история, пульс и прерванные дуэли, друзья с нулём в Friends, статистика в карточке игрока
 ├── .gitignore                         # ✅ исключает .DS_Store, xcuserdata, DerivedData, .build, .env
 ├── Packages/
 │   └── RepsCounterKit/                # ✅ локальный Swift-пакет (iOS 18+, macOS 15 только для `swift test`)
@@ -53,7 +53,7 @@ RepsCounter-Duel/                      # корень git-репозитория
 │       │       ├── LeaderboardRanking.swift   # ✅ сортировка рейтинга: равные суммы — одно место, стабильная вторичная сортировка
 │       │       ├── BackendConfiguration.swift # ✅ URL проекта + anon key → SupabaseClient (проект ещё не создан)
 │       │       ├── SupabaseBackend.swift      # ✅ один SupabaseClient + анонимная сессия (сброс при новой установке); SupabaseNicknameAvailabilityService (RPC is_nickname_available), SupabaseProfileService (регистрация upsert, смена ника и эмодзи)
-│       │       ├── SupabaseFriendsService.swift # ✅ друзья через RPC: поиск, заявки, ответ, мои друзья, входящие, друзья игрока; ошибки «не найден» / «сам себе» / «лимит»
+│       │       ├── SupabaseFriendsService.swift # ✅ друзья через RPC: поиск (с настоящей статистикой и местом недели), заявки, ответ, мои друзья и друзья игрока (с «Top N»), входящие; ошибки «не найден» / «сам себе» / «лимит»
 │       │       ├── StatsService.swift         # ✅ рейтинг недели, история дуэлей, моя статистика, Top Friends (Supabase + пустой мок); `LeaderboardEntry.weeklyRank` — место и «сколько повторов до топ-N»
 │       │       ├── DuelService.swift          # ✅ DuelSnapshot (дуэль глазами участника, время переведено на часы устройства), DuelHeadToHead (статистика обоих), протоколы DuelServicing и TrainingRecordSyncing, разбор ответов сервера
 │       │       ├── SupabaseDuelService.swift  # ✅ дуэли через RPC (create, incoming, view, respond, ready, rep, finish, leave) + ошибки busy / not friends / no longer available / rate limited
@@ -235,6 +235,7 @@ RepsCounter-Duel/                      # корень git-репозитория
 - `duel_head_to_head(дуэль)` — ✅ настоящая статистика обоих игроков дуэли: победы / поражения / ничьи / сумма повторов по завершённым дуэлям (поражения выходом и незавершённые не считаются) + PR по упражнению дуэли. Проверено SQL-тестом.
 
 - Обрыв связи — ✅ `duel_heartbeat(дуэль)` раз в секунду в лобби и во время дуэли (повторы тоже считаются пульсом); если игрок молчит дольше 10 с во время дуэли, фаза становится `interrupted`, `finish_duel` сохраняет её так, в рейтинг она не идёт. Проверено SQL-тестом.
+- Карточка игрока и списки друзей — ✅ `find_player` отдаёт ещё статистику за всё время (победы / поражения / ничьи / сумма повторов по завершённым дуэлям) и место недели в Global; `my_friends` и `player_friends` — место недели у каждого («Top N», без повторов на неделе — без места). Проверено SQL-тестом.
 - Рейтинг и статистика (этап 5) — ✅ считаются из завершённых дуэлей, отдельных итоговых таблиц нет: `weekly_leaderboard(scope, max)` (неделя с понедельника 00:00 UTC; Global — только у кого есть повторы, Friends — я и все друзья, без повторов — 0; равные суммы — одно место), `my_duel_history(since, max)`, `my_stats()`, `top_friends_this_week()` (3 друга с наибольшей суммой недели + их % побед). Проверено SQL-тестом: прошлая неделя и поражения выходом не считаются, ничья в рейтинге, Friends — только я и друзья.
 
 Поток регистрации: `NicknameStepView` → `SupabaseNicknameAvailabilityService` (анонимная сессия + RPC) → `ProfileReadyStepView` → `SupabaseProfileService.register` (upsert своей строки; 23505 → ник занят). Edit Profile → `SupabaseProfileService.updateNickname / updateEmoji`. Новая установка: `AppServices` видит отсутствие метки в UserDefaults и удаляет старую сессию из Keychain до первого запроса.
