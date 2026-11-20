@@ -1,5 +1,6 @@
 import Foundation
 import Supabase
+import ExerciseAnalyzer
 
 /// The app's single Supabase client and its anonymous session (CLAUDE.md §3).
 /// - First launch: `ensureSession()` signs in anonymously (needs network).
@@ -49,7 +50,7 @@ public struct SupabaseNicknameAvailabilityService: NicknameAvailabilityChecking 
 }
 
 /// Registration and Edit Profile on the `profiles` table (RLS: only my own row).
-public struct SupabaseProfileService: ProfileRegistering, ProfileUpdating {
+public struct SupabaseProfileService: ProfileRegistering, ProfileUpdating, TrainingRecordSyncing {
     private let backend: SupabaseBackend
 
     public init(backend: SupabaseBackend) {
@@ -100,6 +101,19 @@ public struct SupabaseProfileService: ProfileRegistering, ProfileUpdating {
             .update(EmojiChange(emoji: emoji))
             .eq("id", value: userID)
             .execute()
+    }
+
+    public func saveTrainingRecord(_ reps: Int, for exercise: Exercise) async throws -> Int {
+        struct Params: Encodable {
+            let exercise: String
+            let reps: Int
+        }
+        try await backend.ensureSession()
+        let stored: Int = try await backend.client
+            .rpc("save_training_record", params: Params(exercise: exercise.rawValue, reps: reps))
+            .execute()
+            .value
+        return stored
     }
 
     /// Postgres unique violation → taken; check violation → invalid nickname.

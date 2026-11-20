@@ -75,3 +75,25 @@ import Testing
         #expect(MockData.homeFilled().hasTrainingRecords)
     }
 }
+
+@Suite struct WeeklyRankFromBoardTests {
+    private func board(_ totals: [Int]) -> [LeaderboardEntry] {
+        LeaderboardRanking.rank(totals.enumerated().map { (PlayerProfile(serverNickname: "p\($0.offset)", emoji: "🐧"), $0.element) })
+    }
+
+    @Test func repsToTheNextTopN() throws {
+        // 25 players, 100 → 4 by 4; "p23" is #24 with 8, #20 has 24 → 16 more reps.
+        let entries = board((0..<25).map { 100 - $0 * 4 })
+        let me = PlayerProfile(serverNickname: "P23", emoji: "🐧")
+        let rank = try #require(LeaderboardEntry.weeklyRank(for: me, in: entries))
+        #expect(rank.position == 24)
+        #expect(rank.milestone == 20)
+        #expect(rank.repsToNextMilestone == 16)
+    }
+
+    @Test func leaderHasNoMilestoneAndAbsentPlayerHasNoRank() {
+        let entries = board([30, 20])
+        #expect(LeaderboardEntry.weeklyRank(for: PlayerProfile(serverNickname: "p0", emoji: "🐧"), in: entries)?.repsToNextMilestone == nil)
+        #expect(LeaderboardEntry.weeklyRank(for: PlayerProfile(serverNickname: "nobody", emoji: "🐧"), in: entries) == nil)
+    }
+}
