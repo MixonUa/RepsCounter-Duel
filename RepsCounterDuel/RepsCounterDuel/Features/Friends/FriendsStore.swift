@@ -19,6 +19,24 @@ final class FriendsStore {
 
     var acceptedFriends: [FriendListItem] { friends.filter { $0.status == .friend } }
 
+    /// Long-press "Remove from Friends" on my list.
+    func remove(_ item: FriendListItem) async {
+        withAnimation(.snappy) { friends.removeAll { $0.id == item.id } }
+        do { try await service.removeFriend(item.profile) } catch {
+            AppLog.backend.error("Removing a friend failed: \(String(describing: error), privacy: .public)")
+        }
+        await refresh()
+    }
+
+    /// Long-press "Cancel Request" on my list.
+    func cancelRequest(_ item: FriendListItem) async {
+        withAnimation(.snappy) { friends.removeAll { $0.id == item.id } }
+        do { try await service.cancelFriendRequest(to: item.profile) } catch {
+            AppLog.backend.error("Cancelling a friend request failed: \(String(describing: error), privacy: .public)")
+        }
+        await refresh()
+    }
+
     func refresh() async {
         do {
             friends = try await service.fetchFriends()

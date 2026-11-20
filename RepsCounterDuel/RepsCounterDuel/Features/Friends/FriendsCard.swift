@@ -12,6 +12,9 @@ struct FriendsCard: View {
     let onSelectFriend: (FriendListItem) -> Void
     /// nil hides "Add New Friend" (another player's friends, read-only).
     let onAddFriend: (() -> Void)?
+    /// PROVISIONAL (no Figma frame): long-press menu actions on my own list.
+    var onRemoveFriend: ((FriendListItem) -> Void)?
+    var onCancelRequest: ((FriendListItem) -> Void)?
 
     var body: some View {
         VStack(spacing: RCSpacing.xxs) {
@@ -83,13 +86,30 @@ struct FriendsCard: View {
         .frame(height: 68)
         .contentShape(Rectangle())
 
-        if item.status == .friend {
-            Button { onSelectFriend(item) } label: { content }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(item.profile.nickname), top \(item.weeklyRank ?? 0)")
-        } else {
-            content
-                .accessibilityElement(children: .combine)
+        Group {
+            if item.status == .friend {
+                Button { onSelectFriend(item) } label: { content }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(item.profile.nickname), top \(item.weeklyRank ?? 0)")
+            } else {
+                content
+                    .accessibilityElement(children: .combine)
+            }
+        }
+        .contextMenu { menu(for: item) }
+    }
+
+    @ViewBuilder
+    private func menu(for item: FriendListItem) -> some View {
+        switch item.status {
+        case .friend:
+            if let onRemoveFriend {
+                Button("Remove from Friends", systemImage: "person.badge.minus", role: .destructive) { onRemoveFriend(item) }
+            }
+        case .requestSent:
+            if let onCancelRequest {
+                Button("Cancel Request", systemImage: "xmark.circle", role: .destructive) { onCancelRequest(item) }
+            }
         }
     }
 

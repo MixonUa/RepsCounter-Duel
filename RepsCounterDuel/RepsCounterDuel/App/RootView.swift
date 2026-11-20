@@ -72,11 +72,13 @@ struct MainTabsView: View {
 
     private var homeOverview: HomeOverview {
         if showsFilledData { return MockData.homeFilled(firstWeekday: firstWeekday) }
-        // Server: duel reps per day, last duel, weekly place; phone: training records.
+        // Server: duel reps per day, last duel, weekly place; phone: training records and their
+        // growth since the start of the same week as the chart ("+N this week").
+        let week = WeekSummary.make(today: .now, dailyReps: statsStore.dailyReps(), firstWeekday: firstWeekday)
         return HomeOverview(
-            week: WeekSummary.make(today: .now, dailyReps: statsStore.dailyReps(), firstWeekday: firstWeekday),
+            week: week,
             trainingRecords: trainingStore.progress.records,
-            trainingRecordGains: [:],
+            trainingRecordGains: trainingStore.progress.gains(since: week.start),
             lastDuel: statsStore.recentDuels.first,
             rank: LeaderboardEntry.weeklyRank(for: me, in: statsStore.global)
         )

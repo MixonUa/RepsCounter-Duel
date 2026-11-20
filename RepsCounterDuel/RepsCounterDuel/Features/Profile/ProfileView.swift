@@ -53,7 +53,9 @@ struct ProfileView: View {
                     FriendsListView(
                         friends: overview.friends,
                         onOpenFriend: openPlayer,
-                        onAddFriend: { isAddFriendPresented = true }
+                        onAddFriend: { isAddFriendPresented = true },
+                        onRemoveFriend: { item in Task { await friendsStore.remove(item) } },
+                        onCancelRequest: { item in Task { await friendsStore.cancelRequest(item) } }
                     )
                 case .player(let card):
                     PlayerCardView(

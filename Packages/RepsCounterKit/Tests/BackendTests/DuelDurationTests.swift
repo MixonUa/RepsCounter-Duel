@@ -68,3 +68,30 @@ import Testing
         #expect(progress.record(for: .pushUps) == 5)
     }
 }
+
+@Suite struct TrainingRecordGainTests {
+    private let weekStart = Date(timeIntervalSince1970: 1_000_000)
+
+    @Test func gainIsTheGrowthSinceTheWeekStarted() {
+        var progress = TrainingProgress()
+        progress.add(reps: 10, of: .squats, at: weekStart.addingTimeInterval(-86_400))
+        progress.add(reps: 14, of: .squats, at: weekStart.addingTimeInterval(3_600))
+        progress.add(reps: 9, of: .squats, at: weekStart.addingTimeInterval(7_200))
+        progress.add(reps: 5, of: .pushUps, at: weekStart.addingTimeInterval(60))
+        #expect(progress.gains(since: weekStart) == [.squats: 4, .pushUps: 5])
+    }
+
+    @Test func noGainWithoutAnImprovementThisWeek() {
+        var progress = TrainingProgress()
+        progress.add(reps: 10, of: .squats, at: weekStart.addingTimeInterval(-86_400))
+        progress.add(reps: 8, of: .squats, at: weekStart.addingTimeInterval(60))
+        #expect(progress.gains(since: weekStart).isEmpty)
+    }
+
+    @Test func oldSavesWithoutHistoryStillDecode() throws {
+        let json = #"{"totalReps":30,"records":["squats",12]}"#
+        let progress = try JSONDecoder().decode(TrainingProgress.self, from: Data(json.utf8))
+        #expect(progress.record(for: .squats) == 12)
+        #expect(progress.recordHistory.isEmpty)
+    }
+}

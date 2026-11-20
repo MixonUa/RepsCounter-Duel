@@ -6,7 +6,8 @@ import ExerciseAnalyzer
 /// FIGMA player profile (found by nickname or opened from the friends list): Profile-style blue
 /// header with a glass back button, the same stats card, "Friends" — their 3 most recently added
 /// friends (Figma shows 4 by mistake) with "see all", and "+ Add Friend" at the bottom. No tab bar.
-/// The button states after sending (Request Sent / Friends) are PROVISIONAL.
+/// The button states after sending (Request Sent / Friends) are PROVISIONAL; tapping them asks to
+/// cancel the request / remove the friend (PROVISIONAL, no Figma frame).
 struct PlayerCardView: View {
     let card: PlayerCard
     let service: any FriendsServicing
@@ -19,6 +20,7 @@ struct PlayerCardView: View {
     @State private var isSending = false
     @State private var isErrorPresented = false
     @State private var errorMessage = ""
+    @State private var isUndoConfirmationPresented = false
 
     init(card: PlayerCard, service: any FriendsServicing, onSeeAllFriends: @escaping () -> Void, onRelationshipChanged: @escaping () -> Void = {}) {
         self.card = card
@@ -61,7 +63,7 @@ struct PlayerCardView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { actionButton }
         .toolbar(.hidden, for: .navigationBar)
         .hidesTabBar()
-        .alert("Couldn't send the request", isPresented: $isErrorPresented) {
+        .alert("Couldn't update the friendship", isPresented: $isErrorPresented) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage)
@@ -130,7 +132,9 @@ struct PlayerCardView: View {
 
     @ViewBuilder
     private var actionButton: some View {
-        Button(action: sendRequest) {
+        Button {
+            if canSend { sendRequest() } else { isUndoConfirmationPresented = true }
+        } label: {
             if isSending {
                 ProgressView().tint(.white)
             } else {
@@ -142,12 +146,46 @@ struct PlayerCardView: View {
             }
         }
         .buttonStyle(.rcPrimaryLarge)
-        .disabled(!canSend || isSending)
+        .disabled(isSending)
+        .confirmationDialog(
+            relationship == .friends ? "Remove \(card.profile.nickname) from friends?" : "Cancel your friend request?",
+            isPresented: $isUndoConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            if relationship == .friends {
+                Button("Remove from Friends", role: .destructive, action: undo)
+            } else {
+                Button("Cancel Request", role: .destructive, action: undo)
+            }
+            Button("Keep", role: .cancel) {}
+        }
         .padding(.horizontal, RCSpacing.xl)
         .padding(.bottom, RCSpacing.xxs)
     }
 
     private var canSend: Bool { relationship == .none || relationship == .requestReceived }
+
+    /// Removes the friend or withdraws my pending request.
+    private func undo() {
+        guard !isSending else { return }
+        let wasFriend = relationship == .friends
+        isSending = true
+        Task {
+            do {
+                if wasFriend {
+                    try await service.removeFriend(card.profile)
+                } else {
+                    try await service.cancelFriendRequest(to: card.profile)
+                }
+                withAnimation(.snappy) { relationship = .none }
+                onRelationshipChanged()
+            } catch {
+                errorMessage = "Check your internet connection and try again."
+                isErrorPresented = true
+            }
+            isSending = false
+        }
+    }
 
     /// "+ Add Friend": sends a request, or accepts theirs when they had already asked me.
     private func sendRequest() {

@@ -112,6 +112,14 @@ public struct SupabaseFriendsService: FriendsServicing {
         return rows.map { FriendListItem(profile: $0.profile, weeklyRank: $0.weekly_rank, status: .friend) }
     }
 
+    public func removeFriend(_ player: PlayerProfile) async throws {
+        let _: String = try await call("remove_friend", ["player_nickname": player.nickname])
+    }
+
+    public func cancelFriendRequest(to player: PlayerProfile) async throws {
+        let _: String = try await call("cancel_friend_request", ["player_nickname": player.nickname])
+    }
+
     // MARK: - Calls
 
     private func call<T: Decodable>(_ function: String, _ params: [String: String] = [:]) async throws -> T {

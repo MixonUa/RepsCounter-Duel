@@ -69,6 +69,10 @@ public protocol FriendsServicing: Sendable {
     func fetchIncomingRequests() async throws -> [PlayerProfile]
     /// All friends of another player (player card → see all).
     func fetchFriends(of player: PlayerProfile) async throws -> [FriendListItem]
+    /// Unfriend (either side may do it).
+    func removeFriend(_ player: PlayerProfile) async throws
+    /// Withdraw my pending request.
+    func cancelFriendRequest(to player: PlayerProfile) async throws
 }
 
 /// UI-stage stand-in with a few known players. `offline` simulates a network error.
@@ -100,6 +104,14 @@ public struct MockFriendsService: FriendsServicing {
     public func fetchFriends() async throws -> [FriendListItem] { [] }
 
     public func fetchIncomingRequests() async throws -> [PlayerProfile] { [] }
+
+    public func removeFriend(_ player: PlayerProfile) async throws {
+        try await Task.sleep(for: delay)
+    }
+
+    public func cancelFriendRequest(to player: PlayerProfile) async throws {
+        try await Task.sleep(for: delay)
+    }
 
     public func fetchFriends(of player: PlayerProfile) async throws -> [FriendListItem] {
         players.first { $0.profile.nickname.lowercased() == player.nickname.lowercased() }?.allFriends ?? []

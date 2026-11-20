@@ -10,12 +10,21 @@ struct FriendsListView: View {
     let friends: [FriendListItem]
     let onOpenFriend: (FriendListItem) -> Void
     let onAddFriend: (() -> Void)?
+    var onRemoveFriend: ((FriendListItem) -> Void)?
+    var onCancelRequest: ((FriendListItem) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
-            FriendsCard(friends: friends, showsChevron: true, onSelectFriend: onOpenFriend, onAddFriend: onAddFriend)
+            FriendsCard(
+                friends: friends,
+                showsChevron: true,
+                onSelectFriend: onOpenFriend,
+                onAddFriend: onAddFriend,
+                onRemoveFriend: onRemoveFriend,
+                onCancelRequest: onCancelRequest
+            )
             .padding(.horizontal, RCSpacing.m)
             .padding(.top, RCSpacing.s - 2)
         }
