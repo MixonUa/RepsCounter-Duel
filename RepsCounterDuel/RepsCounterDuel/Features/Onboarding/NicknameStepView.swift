@@ -1,4 +1,5 @@
 import SwiftUI
+import OSLog
 import Backend
 import DesignSystem
 
@@ -9,6 +10,8 @@ struct NicknameStepView: View {
     private enum CheckError: Equatable {
         case taken
         case network
+        case server
+        case invalid
 
         var message: String {
             switch self {
@@ -16,6 +19,10 @@ struct NicknameStepView: View {
             case .taken: "This username is already taken.\nPlease, choose different variant."
             // PROVISIONAL: no frame for the offline state yet.
             case .network: "No connection. Check your internet\nand try again."
+            // PROVISIONAL: the server answered with an error (not a connection problem).
+            case .server: "Something went wrong on our side.\nPlease try again later."
+            // PROVISIONAL: decided rules, no Figma frame.
+            case .invalid: "\(NicknameRules.formatHint)\n(no spaces or emoji)"
             }
         }
     }
@@ -41,7 +48,7 @@ struct NicknameStepView: View {
                 .focused($isFieldFocused)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                // PROVISIONAL: Latin keyboard (as in Figma); allowed nickname characters are still open.
+                // Latin keyboard (as in Figma): 3–20 letters, digits, _ or . (decided 2026-11-20).
                 .keyboardType(.asciiCapable)
                 .onSubmit(submit)
                 .padding(.horizontal, RCSpacing.m)
@@ -84,6 +91,10 @@ struct NicknameStepView: View {
     /// was edited in the meantime is ignored.
     private func submit() {
         guard NicknameRules.canSubmit(nickname), !isChecking else { return }
+        guard NicknameRules.isValid(nickname) else {
+            error = .invalid
+            return
+        }
         let submitted = nickname
         // Return on the keyboard resigns focus by default; keep the keyboard up while checking.
         isFieldFocused = true
@@ -103,8 +114,9 @@ struct NicknameStepView: View {
                 onContinue()
             case .success(false):
                 error = .taken
-            case .failure:
-                error = .network
+            case .failure(let failure):
+                AppLog.backend.error("Nickname check failed: \(String(describing: failure), privacy: .public)")
+                error = failure.isNetworkError ? .network : .server
             }
         }
     }

@@ -4,15 +4,15 @@ import DesignSystem
 
 /// First-launch onboarding. The gradient background is painted once here (not per step) so it
 /// does not restart under the progress header.
-/// UI stage: nickname check, registration and purchases use mock services (stage 1 wires the
-/// server); the camera permission is real.
+/// Nickname check and registration go to Supabase (anonymous session + `profiles`); purchases are
+/// still mock; the camera permission is real.
 ///
 /// Once the profile is registered, the current step is remembered: changing the camera permission
 /// in Settings makes iOS terminate the app, and onboarding must resume, not start over.
 struct OnboardingFlowView: View {
     let onFinish: () -> Void
-    var nicknameChecker: any NicknameAvailabilityChecking = MockNicknameAvailabilityService()
-    var registrar: any ProfileRegistering = MockProfileRegistrationService()
+    var nicknameChecker: any NicknameAvailabilityChecking = AppServices.nicknameChecker
+    var registrar: any ProfileRegistering = AppServices.registrar
     var purchases: any PaywallPurchasing = MockPaywallPurchaseService()
     var cameraPermission: any CameraPermissionProviding = SystemCameraPermission()
 

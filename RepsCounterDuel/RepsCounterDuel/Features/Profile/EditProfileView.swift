@@ -1,13 +1,14 @@
 import SwiftUI
+import OSLog
 import Backend
 import DesignSystem
 
 /// PROVISIONAL design (no Figma frame): Profile-style blue header with the avatar and nickname.
 /// Tap the avatar → emoji grid; pencil next to the nickname → custom alert to rename with the
-/// same validation and availability check as onboarding. Changes are saved locally (UI stage;
-/// stage 1 sends them to the server, which re-checks nickname uniqueness).
+/// same validation as onboarding. Changes go to the server (`profiles`, which re-checks nickname
+/// uniqueness) and are mirrored locally for the UI.
 struct EditProfileView: View {
-    var nicknameChecker: any NicknameAvailabilityChecking = MockNicknameAvailabilityService()
+    var profileUpdater: any ProfileUpdating = AppServices.profileUpdater
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage(LocalStorageKeys.nickname) private var storedNickname = ""
@@ -40,7 +41,7 @@ struct EditProfileView: View {
             if isRenaming {
                 NicknameChangeAlert(
                     currentNickname: nickname,
-                    checker: nicknameChecker,
+                    updater: profileUpdater,
                     onSave: { newNickname in
                         storedNickname = newNickname
                         withAnimation(.snappy) { isRenaming = false }
@@ -54,7 +55,14 @@ struct EditProfileView: View {
         .sheet(isPresented: $isAvatarPickerPresented) {
             AvatarPickerSheet(selection: Binding(
                 get: { avatar },
-                set: { storedEmoji = $0.emoji }
+                set: { newAvatar in
+                    let previous = storedEmoji
+                    storedEmoji = newAvatar.emoji
+                    // PROVISIONAL: optimistic; restore the old emoji if the server refuses.
+                    Task {
+                        do { try await profileUpdater.updateEmoji(newAvatar.emoji) } catch { storedEmoji = previous }
+                    }
+                }
             ))
         }
     }
@@ -169,14 +177,15 @@ private struct AvatarPickerSheet: View {
 /// non-empty nickname; it checks availability first.
 private struct NicknameChangeAlert: View {
     let currentNickname: String
-    let checker: any NicknameAvailabilityChecking
+    let updater: any ProfileUpdating
     let onSave: (String) -> Void
     let onCancel: () -> Void
 
     private enum CheckError {
-        case taken, network
+        case taken, network, invalid
         var message: String {
             switch self {
+            case .invalid: "\(NicknameRules.formatHint)\n(no spaces or emoji)"
             case .taken: "This username is already taken.\nPlease, choose different variant."
             case .network: "No connection. Check your internet\nand try again."
             }
@@ -256,18 +265,24 @@ private struct NicknameChangeAlert: View {
 
     private func save() {
         guard canSave else { return }
+        guard NicknameRules.isValid(text) else {
+            error = .invalid
+            return
+        }
         let submitted = text
         isFocused = true
         isChecking = true
         Task {
-            let result: Result<Bool, any Error>
-            do { result = .success(try await checker.isNicknameAvailable(submitted)) } catch { result = .failure(error) }
+            let result: Result<String, any Error>
+            do { result = .success(try await updater.updateNickname(submitted)) } catch { result = .failure(error) }
             isChecking = false
-            guard text == submitted else { return }
             switch result {
-            case .success(true): onSave(NicknameRules.normalized(submitted))
-            case .success(false): error = .taken
-            case .failure: error = .network
+            case .success(let saved): onSave(saved)
+            case .failure(ProfileRegistrationError.nicknameTaken): error = .taken
+            case .failure(ProfileRegistrationError.invalidNickname): error = .invalid
+            case .failure(let failure):
+                AppLog.backend.error("Nickname change failed: \(String(describing: failure), privacy: .public)")
+                error = .network
             }
         }
     }

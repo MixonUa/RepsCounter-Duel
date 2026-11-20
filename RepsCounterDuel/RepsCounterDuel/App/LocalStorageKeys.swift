@@ -4,6 +4,8 @@ enum LocalStorageKeys {
     static let nickname = "onboardingRegisteredNickname"
     static let emoji = "onboardingRegisteredEmoji"
     static let onboardingResumeStep = "onboardingResumeStep"
+    /// Set on first launch; its absence means a fresh install (Keychain session is dropped).
+    static let installMarker = "installMarker"
 
     /// Settings → Rep sound (Bool, default on).
     static let repSound = "settingsRepSound"

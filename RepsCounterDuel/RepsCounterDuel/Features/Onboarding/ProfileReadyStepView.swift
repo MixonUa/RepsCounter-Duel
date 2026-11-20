@@ -1,4 +1,5 @@
 import SwiftUI
+import OSLog
 import Backend
 import DesignSystem
 
@@ -67,7 +68,10 @@ struct ProfileReadyStepView: View {
                 onRegistered(try await registrar.register(nickname: nickname, emoji: emoji))
             } catch ProfileRegistrationError.nicknameTaken {
                 onNicknameTaken()
+            } catch ProfileRegistrationError.invalidNickname {
+                onNicknameTaken()
             } catch {
+                AppLog.backend.error("Registration failed: \(String(describing: error), privacy: .public)")
                 isErrorPresented = true
             }
         }
