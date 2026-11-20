@@ -28,7 +28,11 @@ final class StatsStore {
             async let history = service.duelHistory(since: .now.addingTimeInterval(-8 * 24 * 3600), limit: 100)
             async let stats = service.myStats()
             async let top = service.topFriendsThisWeek()
-            (self.global, self.friends, recentDuels, myStats, topFriends) = try await (global, friends, history, stats, top)
+            let friendsBoard: [LeaderboardEntry]
+            (self.global, friendsBoard, recentDuels, myStats, topFriends) = try await (global, friends, history, stats, top)
+            // The server lists me + every friend (0 without reps). Only me = no friends yet: keep the
+            // empty state ("Add friends to start your own top").
+            self.friends = friendsBoard.count > 1 ? friendsBoard : []
         } catch {
             AppLog.backend.error("Loading stats failed: \(String(describing: error), privacy: .public)")
         }
