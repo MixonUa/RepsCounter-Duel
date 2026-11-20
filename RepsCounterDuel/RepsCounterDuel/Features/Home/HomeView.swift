@@ -62,10 +62,10 @@ struct HomeView: View {
         .scrollIndicators(.hidden)
         .background(RCColor.background.ignoresSafeArea())
         .fullScreenCover(isPresented: $isSettingsPresented) { SettingsView() }
-        .sheet(item: $sheet) { sheet in
+        .fullScreenCover(item: $sheet) { sheet in
             switch sheet {
             case .duelHistory:
-                PlaceholderSheet(title: "Recent duels", message: "Duel history arrives with the duel screens.")
+                DuelHistoryView(me: me)
             }
         }
     }

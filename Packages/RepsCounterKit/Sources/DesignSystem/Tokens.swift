@@ -85,6 +85,8 @@ public enum RCColor {
     public static let resultWinAvatar = Color(rgb: 0x1E8494)
     public static let resultLossAvatar = Color(rgb: 0x594C8E)
     public static let resultCard = Color(rgb: 0x0E0E0E)
+    /// FIGMA Duels History: highlighted (winner) avatar fill.
+    public static let historyWinnerFill = Color(rgb: 0x8EC6FF)
     /// FIGMA: light rim around the icon circle on a goal card.
     public static let goalIconRim = Color(rgb: 0xCFD8F3)
     /// FIGMA: thin divider inside white cards.
