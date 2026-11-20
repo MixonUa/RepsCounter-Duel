@@ -33,6 +33,10 @@ struct LiveDuelView: View {
     @State private var handledReps = 0
     @State private var isSendingReps = false
     @State private var didOpponentLeave = false
+    /// The server answered within the last few seconds (else "Reconnecting…").
+    @State private var lastServerContact = Date.now
+    @State private var isReconnecting = false
+    @State private var wasInterrupted = false
 
     init(
         lobby: DuelLobby,
@@ -83,6 +87,25 @@ struct LiveDuelView: View {
         .animation(.snappy, value: phase)
         .task { await run() }
         .onChange(of: tracker.reps) { Task { await sendPendingReps() } }
+        .overlay(alignment: .top) {
+            if isReconnecting {
+                // PROVISIONAL (no Figma frame): prominent reconnection banner (CLAUDE.md §6).
+                Label("Reconnecting…", systemImage: "wifi.exclamationmark")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, RCSpacing.l)
+                    .padding(.vertical, RCSpacing.s)
+                    .background(RCColor.duelRed, in: Capsule())
+                    .padding(.top, 140)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .alert("Duel interrupted", isPresented: $wasInterrupted) {
+            Button("Close", action: onGiveUp)
+        } message: {
+            // PROVISIONAL copy: interrupted = no winner, no rating reps (CLAUDE.md §6).
+            Text("The connection was lost for too long. No reps were added to the rating.")
+        }
         .alert("Duel over", isPresented: $didOpponentLeave) {
             Button("Close", action: onGiveUp)
         } message: {
@@ -179,25 +202,40 @@ struct LiveDuelView: View {
         // Only full cycles inside the server window score on the device too.
         tracker.startScoring(duration: max(0, endsAt.timeIntervalSinceNow))
 
-        while Date.now < endsAt, !Task.isCancelled, !didOpponentLeave {
+        while Date.now < endsAt, !Task.isCancelled, !didOpponentLeave, !wasInterrupted {
             await poll()
             try? await Task.sleep(for: .seconds(1))
         }
-        if Task.isCancelled || didOpponentLeave { return }
+        if Task.isCancelled || didOpponentLeave || wasInterrupted { return }
         phase = .finished
         tracker.stopScoring()
         await sendPendingReps()
         await finalize()
     }
 
-    /// Opponent's score (and a forfeit) from the server.
+    /// Heartbeat + the opponent's score from the server. Without an answer for 3 s the screen shows
+    /// "Reconnecting…" while the phone keeps counting; reps are sent once the connection is back
+    /// (the server accepts them only inside the duel window). After the server's 10 s grace the
+    /// duel is interrupted.
     private func poll() async {
-        guard let snapshot = try? await service.view(start.id) else { return }
+        guard let snapshot = try? await service.heartbeat(start.id) else {
+            withAnimation(.snappy) { isReconnecting = Date.now.timeIntervalSince(lastServerContact) > 3 }
+            return
+        }
+        lastServerContact = .now
+        withAnimation(.snappy) { isReconnecting = false }
         opponentReps = snapshot.opponentReps
         serverReps = max(serverReps, snapshot.myReps)
-        if snapshot.phase == .forfeited || snapshot.phase == .cancelled, !snapshot.forfeitedByMe {
+        switch snapshot.phase {
+        case .interrupted:
+            tracker.stopScoring()
+            wasInterrupted = true
+        case .forfeited, .cancelled:
+            guard !snapshot.forfeitedByMe else { return }
             tracker.stopScoring()
             didOpponentLeave = true
+        default:
+            if handledReps < tracker.reps { Task { await sendPendingReps() } }
         }
     }
 
@@ -228,9 +266,15 @@ struct LiveDuelView: View {
         let finalizeAt = endsAt.addingTimeInterval(2.5)
         if Date.now < finalizeAt { try? await Task.sleep(for: .seconds(finalizeAt.timeIntervalSinceNow)) }
         for attempt in 0..<10 {
-            if let snapshot = try? await service.finish(start.id), snapshot.phase == .completed {
-                onFinish(snapshot.myReps, snapshot.opponentReps)
-                return
+            if let snapshot = try? await service.finish(start.id) {
+                if snapshot.phase == .completed {
+                    onFinish(snapshot.myReps, snapshot.opponentReps)
+                    return
+                }
+                if snapshot.phase == .interrupted {
+                    wasInterrupted = true
+                    return
+                }
             }
             try? await Task.sleep(for: .seconds(attempt < 3 ? 1 : 3))
         }

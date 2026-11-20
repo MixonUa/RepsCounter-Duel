@@ -84,7 +84,7 @@ struct DuelLobbyView: View {
 
     private func watch() async {
         while !Task.isCancelled, !isCancelled {
-            if let snapshot = try? await service.view(lobby.id) { apply(snapshot) }
+            if let snapshot = try? await service.heartbeat(lobby.id) { apply(snapshot) }
             try? await Task.sleep(for: .seconds(1))
         }
     }
@@ -95,7 +95,7 @@ struct DuelLobbyView: View {
         switch snapshot.phase {
         case .countdown, .live:
             onBothReady(snapshot)
-        case .cancelled, .expired, .declined, .forfeited, .completed:
+        case .cancelled, .expired, .declined, .forfeited, .completed, .interrupted:
             isCancelled = true
         default:
             break

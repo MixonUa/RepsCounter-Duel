@@ -7,11 +7,13 @@ import ExerciseAnalyzer
 public struct DuelSnapshot: Sendable, Hashable, Identifiable {
     public enum Phase: String, Sendable, Hashable {
         case invited, expired, declined, cancelled, lobby, countdown, live, finishing, completed, forfeited
+        /// A player was silent longer than the reconnect grace: no winner, no rating reps.
+        case interrupted
 
         /// The duel is over (no more changes expected).
         public var isClosed: Bool {
             switch self {
-            case .expired, .declined, .cancelled, .completed, .forfeited: true
+            case .expired, .declined, .cancelled, .completed, .forfeited, .interrupted: true
             default: false
             }
         }
@@ -94,6 +96,8 @@ public protocol DuelServicing: Sendable {
     func submitRep(_ duel: UUID, sequence: Int) async throws -> DuelSnapshot
     func finish(_ duel: UUID) async throws -> DuelSnapshot
     func leave(_ duel: UUID) async throws -> DuelSnapshot
+    /// "I'm still here" (lobby / countdown / live, about every second); returns the duel view.
+    func heartbeat(_ duel: UUID) async throws -> DuelSnapshot
     /// Real stats of both players for the lobby; nil when the duel is not mine.
     func headToHead(_ duel: UUID, exercise: Exercise) async throws -> DuelHeadToHead?
 }

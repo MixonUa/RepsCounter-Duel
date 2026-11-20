@@ -64,6 +64,10 @@ public struct SupabaseDuelService: DuelServicing {
         try await snapshot("leave_duel", ["duel": duel])
     }
 
+    public func heartbeat(_ duel: UUID) async throws -> DuelSnapshot {
+        try await snapshot("duel_heartbeat", ["duel": duel])
+    }
+
     public func headToHead(_ duel: UUID, exercise: Exercise) async throws -> DuelHeadToHead? {
         struct Row: Decodable {
             let me: PlayerStatsRow

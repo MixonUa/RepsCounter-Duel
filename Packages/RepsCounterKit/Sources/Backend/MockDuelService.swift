@@ -116,6 +116,11 @@ public actor MockDuelService: DuelServicing {
         return snapshot(duel)
     }
 
+    public func heartbeat(_ id: UUID) async throws -> DuelSnapshot {
+        guard let snapshot = try await view(id) else { throw DuelServiceError.noLongerAvailable }
+        return snapshot
+    }
+
     /// The simulated friend has no history yet.
     public func headToHead(_ id: UUID, exercise: Exercise) async throws -> DuelHeadToHead? {
         guard duels[id] != nil else { return nil }
