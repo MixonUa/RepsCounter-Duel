@@ -1,30 +1,31 @@
 import SwiftUI
+import OSLog
 import Backend
 import DesignSystem
 
 /// FIGMA "Waiting..." (host, after Send Challenge): hourglass, "<friend> must accept the
-/// challenge in 3:00 minutes" with a live countdown, Cancel Challenge, ✕ only (no back).
-/// - ✕ and Cancel Challenge both withdraw the invitation and close the flow (PROVISIONAL:
-///   there is no screen to return to a pending invitation).
-/// - When the countdown ends the invitation expires: PROVISIONAL "Time's up" state (no Figma frame).
-/// UI stage: nobody accepts the mock invitation, except DEBUG `-debugAutoAccept YES` (the friend
-/// accepts after 3 s); stage 4 listens to the server.
+/// challenge in 3:00 minutes" with a live countdown to the server's expiry, Cancel Challenge, ✕.
+/// Polls the server duel every 2 s: accepted → the lobby opens.
+/// PROVISIONAL (no Figma frames): ✕ also withdraws the invitation; "Time's up" after expiry and
+/// "<friend> declined" after a refusal, both with Close.
 struct DuelWaitingView: View {
-    let friend: PlayerProfile
-    /// Invitation expiry from Figma (3:00). Configurable; the server owns the real deadline.
-    var expiresIn: Duration = .seconds(180)
+    let duel: DuelSnapshot
+    let service: any DuelServicing
     let onCancel: () -> Void
     /// The friend accepted the challenge (opens the lobby).
-    var onAccepted: () -> Void = {}
+    let onAccepted: (DuelSnapshot) -> Void
 
-    @State private var deadline: Date?
-    @State private var isExpired = false
+    private enum Outcome { case expired, declined }
+
+    @State private var outcome: Outcome?
+
+    private var friend: PlayerProfile { duel.opponent }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Spacer()
-                ActivityCloseButton(action: onCancel)
+                ActivityCloseButton(action: cancel)
             }
             .padding(.horizontal, RCSpacing.m)
             .padding(.top, RCSpacing.m)
@@ -35,10 +36,10 @@ struct DuelWaitingView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 242)
-                .opacity(isExpired ? 0.5 : 1)
+                .opacity(outcome == nil ? 1 : 0.5)
                 .accessibilityHidden(true)
 
-            Text(isExpired ? "Time's up" : "Waiting...")
+            Text(title)
                 .font(RCFont.homeTitle)
                 .foregroundStyle(RCColor.textPrimary)
                 .accessibilityAddTraits(.isHeader)
@@ -53,13 +54,13 @@ struct DuelWaitingView: View {
 
             Spacer(minLength: RCSpacing.l)
 
-            if isExpired {
+            if outcome != nil {
                 Button("Close", action: onCancel)
                     .buttonStyle(.rcPrimaryLarge)
                     .padding(.horizontal, RCSpacing.l)
                     .padding(.bottom, RCSpacing.xxs)
             } else {
-                Button("Cancel Challenge", action: onCancel)
+                Button("Cancel Challenge", action: cancel)
                     .buttonStyle(.rcDestructiveLarge)
                     .padding(.horizontal, RCSpacing.l)
                     .padding(.bottom, RCSpacing.xxs)
@@ -68,32 +69,30 @@ struct DuelWaitingView: View {
         .background(RCColor.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden()
-        .interactiveDismissDisabled(!isExpired)
-        .onAppear {
-            if deadline == nil { deadline = .now.addingTimeInterval(TimeInterval(expiresIn.components.seconds)) }
-        }
-        .task(id: deadline) {
-            guard let deadline else { return }
-            try? await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSinceNow)))
-            if !Task.isCancelled { withAnimation(.snappy) { isExpired = true } }
-        }
-        .task {
-            #if DEBUG
-            guard UserDefaults.standard.bool(forKey: "debugAutoAccept") else { return }
-            try? await Task.sleep(for: .seconds(3))
-            if !Task.isCancelled, !isExpired { onAccepted() }
-            #endif
+        .interactiveDismissDisabled(outcome == nil)
+        .task { await watch() }
+    }
+
+    private var title: String {
+        switch outcome {
+        case .none: "Waiting..."
+        case .expired: "Time's up"
+        case .declined: "Declined"
         }
     }
 
     @ViewBuilder
     private var subtitle: some View {
-        if isExpired {
+        switch outcome {
+        case .expired:
             (Text(friend.nickname).foregroundStyle(RCColor.accent)
              + Text(" didn't accept the challenge").foregroundStyle(RCColor.textSecondary))
-        } else if let deadline {
+        case .declined:
+            (Text(friend.nickname).foregroundStyle(RCColor.accent)
+             + Text(" declined the challenge").foregroundStyle(RCColor.textSecondary))
+        case .none:
             TimelineView(.periodic(from: .now, by: 1)) { context in
-                let left = max(0, Int(deadline.timeIntervalSince(context.date).rounded(.up)))
+                let left = max(0, Int(duel.expiresAt.timeIntervalSince(context.date).rounded(.up)))
                 (Text(friend.nickname).foregroundStyle(RCColor.accent)
                  + Text("  must accept the challenge in ").foregroundStyle(RCColor.textSecondary)
                  + Text(String(format: "%d:%02d", left / 60, left % 60)).foregroundStyle(RCColor.accent).monospacedDigit()
@@ -102,10 +101,35 @@ struct DuelWaitingView: View {
             }
         }
     }
-}
 
-#Preview {
-    NavigationStack {
-        DuelWaitingView(friend: PlayerProfile(nickname: "Lena", emoji: "🐱"), onCancel: {})
+    /// Polls the server until the friend answers or the invitation expires.
+    private func watch() async {
+        while !Task.isCancelled, outcome == nil {
+            do {
+                if let current = try await service.view(duel.id) {
+                    switch current.phase {
+                    case .lobby, .countdown, .live:
+                        onAccepted(current)
+                        return
+                    case .expired:
+                        withAnimation(.snappy) { outcome = .expired }
+                    case .declined, .cancelled:
+                        withAnimation(.snappy) { outcome = .declined }
+                    default:
+                        break
+                    }
+                }
+            } catch {
+                AppLog.backend.error("Duel status failed: \(String(describing: error), privacy: .public)")
+                if Date.now >= duel.expiresAt { withAnimation(.snappy) { outcome = .expired } }
+            }
+            try? await Task.sleep(for: .seconds(2))
+        }
+    }
+
+    private func cancel() {
+        let id = duel.id
+        Task { _ = try? await service.leave(id) }
+        onCancel()
     }
 }

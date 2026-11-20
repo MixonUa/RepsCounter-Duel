@@ -27,6 +27,28 @@ enum AppServices {
         usesMocks ? MockFriendsService() : SupabaseFriendsService(backend: backend)
     }
 
+    /// One instance for the app (the mock keeps simulated duels in memory).
+    /// DEBUG with mocks: `-debugIncomingDuel YES` makes a simulated friend invite me on launch.
+    static let duelService: any DuelServicing = {
+        guard usesMocks else { return SupabaseDuelService(backend: backend) }
+        #if DEBUG
+        let incoming = UserDefaults.standard.bool(forKey: "debugIncomingDuel")
+            ? PlayerProfile(serverNickname: "Lena_v", emoji: "🐱") : nil
+        #else
+        let incoming: PlayerProfile? = nil
+        #endif
+        return MockDuelService(incomingFrom: incoming)
+    }()
+
+    static var statsService: any StatsServicing {
+        usesMocks ? MockStatsService() : SupabaseStatsService(backend: backend)
+    }
+
+    /// nil with mocks: training records then stay on the phone only.
+    static var trainingRecordSync: (any TrainingRecordSyncing)? {
+        usesMocks ? nil : SupabaseProfileService(backend: backend)
+    }
+
     static var profileUpdater: any ProfileUpdating {
         usesMocks ? MockProfileUpdateService() : SupabaseProfileService(backend: backend)
     }

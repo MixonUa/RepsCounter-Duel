@@ -16,7 +16,7 @@ struct RatingView: View {
     @State private var isMyRowVisible = false
 
     private var entries: [LeaderboardEntry] { overview.entries(for: scope) }
-    private var myEntry: LeaderboardEntry? { entries.first { $0.player == me } }
+    private var myEntry: LeaderboardEntry? { entries.first { $0.player.id == me.id } }
     private var podium: [LeaderboardEntry] { Array(entries.prefix(3)) }
 
     private var showsPinnedRow: Bool { myEntry != nil && !isMyRowVisible }
@@ -111,7 +111,7 @@ struct RatingView: View {
                 }
             } else {
                 ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                    let isMe = entry.player == me
+                    let isMe = entry.player.id == me.id
                     LeaderboardRow(entry: entry, isMe: isMe, showsSeparator: index < entries.count - 1)
                         .onScrollVisibilityChange(threshold: 0.9) { visible in
                             if isMe { isMyRowVisible = visible }

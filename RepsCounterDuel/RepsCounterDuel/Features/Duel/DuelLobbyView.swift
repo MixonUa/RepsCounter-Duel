@@ -8,21 +8,26 @@ import ExerciseAnalyzer
 /// - ‹ leaves the lobby: before the countdown that cancels the match without rating impact (§6).
 /// - The countdown starts only when both players are ready (`onBothReady`).
 /// PROVISIONAL (no Figma variants): "Waiting for <name>…" status, the button after I'm ready.
-/// UI stage: the opponent becomes ready after a short delay; stage 4 uses server readiness.
+/// Readiness lives on the server: I'm Ready → `set_duel_ready`; the lobby polls the duel every
+/// second for the opponent's status and the server-fixed start (countdown).
+/// PROVISIONAL: if the duel is cancelled meanwhile (opponent left, lobby idle 5 min) the lobby
+/// shows "<name> left the duel" with Close.
 struct DuelLobbyView: View {
     let lobby: DuelLobby
+    let service: any DuelServicing
     let onLeave: () -> Void
-    let onBothReady: () -> Void
-    /// Mock opponent readiness delay.
-    var opponentReadyDelay: Duration = .seconds(3)
+    /// Both are ready: the server snapshot carries `startsAt` / `endsAt`.
+    let onBothReady: (DuelSnapshot) -> Void
 
     @State private var isMeReady = false
     @State private var isOpponentReady = false
+    @State private var isSendingReady = false
+    @State private var isCancelled = false
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                LobbyBackButton(action: onLeave)
+                LobbyBackButton(action: leave)
                 Spacer()
             }
             .padding(.horizontal, RCSpacing.m)
@@ -66,14 +71,51 @@ struct DuelLobbyView: View {
         .environment(\.colorScheme, .dark)
         .animation(.snappy, value: isMeReady)
         .animation(.snappy, value: isOpponentReady)
-        .task {
-            try? await Task.sleep(for: opponentReadyDelay)
-            isOpponentReady = true
-        }
-        .onChange(of: isMeReady && isOpponentReady) { _, bothReady in
-            if bothReady { onBothReady() }
-        }
+        .task { await watch() }
         .sensoryFeedback(.success, trigger: isOpponentReady)
+        .alert("Duel cancelled", isPresented: $isCancelled) {
+            Button("Close", action: onLeave)
+        } message: {
+            Text("\(lobby.opponent.nickname) left the duel.")
+        }
+    }
+
+    // MARK: - Server
+
+    private func watch() async {
+        while !Task.isCancelled, !isCancelled {
+            if let snapshot = try? await service.view(lobby.id) { apply(snapshot) }
+            try? await Task.sleep(for: .seconds(1))
+        }
+    }
+
+    private func apply(_ snapshot: DuelSnapshot) {
+        isMeReady = snapshot.myReady
+        isOpponentReady = snapshot.opponentReady
+        switch snapshot.phase {
+        case .countdown, .live:
+            onBothReady(snapshot)
+        case .cancelled, .expired, .declined, .forfeited, .completed:
+            isCancelled = true
+        default:
+            break
+        }
+    }
+
+    private func setReady() {
+        guard !isSendingReady else { return }
+        isSendingReady = true
+        isMeReady = true
+        Task {
+            defer { isSendingReady = false }
+            do { apply(try await service.setReady(lobby.id)) } catch { isMeReady = false }
+        }
+    }
+
+    private func leave() {
+        let id = lobby.id
+        Task { _ = try? await service.leave(id) }
+        onLeave()
     }
 
     // MARK: - Players
@@ -121,15 +163,16 @@ struct DuelLobbyView: View {
 
             let myRecord = lobby.myStats.trainingRecord(for: lobby.exercise)
             let theirRecord = lobby.opponentStats.trainingRecord(for: lobby.exercise)
+            let known = lobby.hasServerStats
             statRow(
                 label: "\(lobby.exercise == .pushUps ? "Push-up" : "Squat") PR",
                 mine: ("\(myRecord)", Double(myRecord)),
-                theirs: ("\(theirRecord)", Double(theirRecord))
+                theirs: (known ? "\(theirRecord)" : "—", Double(theirRecord))
             )
             statRow(
                 label: "Duels Won",
-                mine: ("\(lobby.myStats.duelsWon)", Double(lobby.myStats.duelsWon)),
-                theirs: ("\(lobby.opponentStats.duelsWon)", Double(lobby.opponentStats.duelsWon))
+                mine: (known ? "\(lobby.myStats.duelsWon)" : "—", Double(lobby.myStats.duelsWon)),
+                theirs: (known ? "\(lobby.opponentStats.duelsWon)" : "—", Double(lobby.opponentStats.duelsWon))
             )
             statRow(
                 label: "Win Rate",
@@ -176,7 +219,7 @@ struct DuelLobbyView: View {
             .buttonStyle(.rcPrimaryLarge)
             .disabled(true)
         } else {
-            Button("I'm Ready") { isMeReady = true }
+            Button("I'm Ready", action: setReady)
                 .buttonStyle(.rcPrimaryLarge)
         }
     }
@@ -238,45 +281,92 @@ struct LobbyBackButton: View {
     }
 }
 
-/// Lobby → (both ready) → countdown + live duel → results.
-/// Play Again returns to a fresh lobby with the same friend, exercise and time (PROVISIONAL:
-/// stage 4 sends a new challenge the friend must accept).
+/// Lobby → (both ready) → countdown + live duel → results → Play Again (a new challenge to the
+/// same friend with the same exercise and time: Waiting... → a fresh lobby once accepted).
 struct DuelLobbyFlow: View {
     let lobby: DuelLobby
+    var service: any DuelServicing = AppServices.duelService
     @Environment(\.dismiss) private var dismiss
-    @State private var isStarting = false
-    @State private var result: (my: Int, opponent: Int)?
-    /// New id per round so the lobby and the live duel start from scratch.
-    @State private var round = 0
+
+    private enum Stage: Equatable {
+        case lobby(DuelLobby)
+        case live(DuelLobby, DuelSnapshot)
+        case result(DuelLobby, my: Int, opponent: Int)
+        case waiting(DuelSnapshot)
+    }
+
+    @State private var stage: Stage?
+    @State private var playAgainError: String?
+    /// Both players' real stats for the current duel (loaded once per duel, before it starts).
+    @State private var headToHead: (duel: UUID, stats: DuelHeadToHead)?
+
+    private var currentDuelID: UUID {
+        switch stage ?? .lobby(lobby) {
+        case .lobby(let l), .live(let l, _), .result(let l, _, _): l.id
+        case .waiting(let duel): duel.id
+        }
+    }
+
+    private func enriched(_ lobby: DuelLobby) -> DuelLobby {
+        guard let headToHead, headToHead.duel == lobby.id else { return lobby }
+        return lobby.withServerStats(headToHead.stats)
+    }
 
     var body: some View {
         Group {
-            if let result {
-                DuelResultView(
-                    lobby: lobby,
-                    myReps: result.my,
-                    opponentReps: result.opponent,
-                    onPlayAgain: {
-                        round += 1
-                        self.result = nil
-                        isStarting = false
-                    },
-                    onExit: { dismiss() }
-                )
-            } else if isStarting {
+            switch stage ?? .lobby(lobby) {
+            case .lobby(let current):
+                DuelLobbyView(lobby: enriched(current), service: service, onLeave: { dismiss() }, onBothReady: { stage = .live(current, $0) })
+            case .live(let current, let start):
                 LiveDuelView(
-                    lobby: lobby,
-                    onFinish: { my, opponent in result = (my, opponent) },
+                    lobby: enriched(current),
+                    start: start,
+                    service: service,
+                    onFinish: { my, opponent in stage = .result(current, my: my, opponent: opponent) },
                     onGiveUp: { dismiss() }
                 )
-            } else {
-                DuelLobbyView(lobby: lobby, onLeave: { dismiss() }, onBothReady: { isStarting = true })
+            case .result(let current, let my, let opponent):
+                DuelResultView(
+                    lobby: enriched(current),
+                    myReps: my,
+                    opponentReps: opponent,
+                    onPlayAgain: { playAgain(current) },
+                    onExit: { dismiss() }
+                )
+            case .waiting(let duel):
+                DuelWaitingView(duel: duel, service: service, onCancel: { dismiss() }, onAccepted: { accepted in
+                    stage = .lobby(DuelLobby(snapshot: accepted, me: lobby.me, myStats: lobby.myStats))
+                })
             }
         }
-        .id(round)
         .transition(.opacity)
-        .animation(.snappy, value: isStarting)
-        .animation(.snappy, value: result == nil)
+        .animation(.snappy, value: stage)
+        .task(id: currentDuelID) { await loadHeadToHead() }
+        .alert("Challenge not sent", isPresented: Binding(get: { playAgainError != nil }, set: { if !$0 { playAgainError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(playAgainError ?? "")
+        }
+    }
+
+    private func loadHeadToHead() async {
+        guard case .lobby(let current) = stage ?? .lobby(lobby), headToHead?.duel != current.id else { return }
+        if let stats = try? await service.headToHead(current.id, exercise: current.exercise) {
+            headToHead = (current.id, stats)
+        }
+    }
+
+    private func playAgain(_ previous: DuelLobby) {
+        Task {
+            do {
+                stage = .waiting(try await service.create(friend: previous.opponent, exercise: previous.exercise, duration: previous.duration))
+            } catch {
+                // PROVISIONAL copy: the friend may have challenged me already (busy).
+                playAgainError = (error as? DuelServiceError) == .busy
+                    ? "\(previous.opponent.nickname) is already in a duel — maybe they challenged you. Check your invitations."
+                    : "Couldn't send the challenge. Check your internet connection and try again."
+            }
+        }
     }
 }
 
@@ -289,7 +379,8 @@ struct DuelLobbyFlow: View {
             duration: .default,
             myStats: PlayerStats(totalDuelReps: 300, duelsWon: 24, duelsLost: 8, duelsTied: 0, trainingRecords: [.pushUps: 55])
         ),
+        service: MockDuelService(),
         onLeave: {},
-        onBothReady: {}
+        onBothReady: { _ in }
     )
 }

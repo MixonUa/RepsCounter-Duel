@@ -40,8 +40,9 @@ struct MainTabsView: View {
     @AppStorage(LocalStorageKeys.emoji) private var emoji = ""
 
     private var me: PlayerProfile {
+        // Same identity as on the server boards (derived from the nickname).
         PlayerProfile(
-            nickname: nickname.isEmpty ? "Nova_07" : nickname,
+            serverNickname: nickname.isEmpty ? "Nova_07" : nickname,
             emoji: emoji.isEmpty ? "🐧" : emoji
         )
     }
@@ -49,6 +50,7 @@ struct MainTabsView: View {
     @State private var isTabBarHidden = false
     @State private var friendRequests = FriendRequestCenter()
     @State private var friendsStore = FriendsStore()
+    @State private var statsStore = StatsStore()
     @Environment(\.scenePhase) private var scenePhase
     @State private var duelInvitations = DuelInvitationCenter()
 
@@ -66,24 +68,33 @@ struct MainTabsView: View {
 
     private var homeOverview: HomeOverview {
         if showsFilledData { return MockData.homeFilled(firstWeekday: firstWeekday) }
-        var overview = MockData.homeEmpty(firstWeekday: firstWeekday)
-        // Real training records saved on the phone (the rest of Home stays mock until stage 5).
-        overview.trainingRecords = trainingStore.progress.records
-        return overview
+        // Server: duel reps per day, last duel, weekly place; phone: training records.
+        return HomeOverview(
+            week: WeekSummary.make(today: .now, dailyReps: statsStore.dailyReps(), firstWeekday: firstWeekday),
+            trainingRecords: trainingStore.progress.records,
+            trainingRecordGains: [:],
+            lastDuel: statsStore.recentDuels.first,
+            rank: LeaderboardEntry.weeklyRank(for: me, in: statsStore.global)
+        )
     }
 
-    /// Friends are real (server); stats, weekly place and Top Friends' weekly numbers come with
-    /// duels (stage 5). Until then Top Friends lists my newest friends without numbers.
+    /// What this phone knows before the server stats arrive: my training records.
+    private var localDuelStats: PlayerStats {
+        var stats = profileOverview.stats
+        for (exercise, reps) in trainingStore.progress.records {
+            stats.trainingRecords[exercise] = max(stats.trainingRecord(for: exercise), reps)
+        }
+        return stats
+    }
+
+    /// Server: my all-time duel stats, weekly place, Top Friends of the week and my friends.
     private var profileOverview: ProfileOverview {
         if showsFilledData { return MockData.profileFilled }
-        let friends = friendsStore.friends
         return ProfileOverview(
-            stats: .empty,
-            weeklyRank: nil,
-            topFriends: friends.filter { $0.status == .friend }.prefix(3).map {
-                TopFriend(profile: $0.profile, winRate: nil, jointReps: 0)
-            },
-            friends: friends
+            stats: statsStore.myStats,
+            weeklyRank: LeaderboardEntry.weeklyRank(for: me, in: statsStore.global)?.position,
+            topFriends: statsStore.topFriends,
+            friends: friendsStore.friends
         )
     }
 
@@ -142,17 +153,35 @@ struct MainTabsView: View {
             guard scenePhase == .active else { return }
             friendRequests.onFriendsChanged = { [friendsStore] in Task { await friendsStore.refresh() } }
             await friendsStore.refresh()
-            await friendRequests.keepUpdated()
+            await trainingStore.syncRecords()
+            await statsStore.refresh()
+            async let requests: Void = friendRequests.keepUpdated()
+            async let duels: Void = duelInvitations.keepUpdated()
+            _ = await (requests, duels)
         }
-        .task { receiveDebugInvitation() }
         .sheet(item: $duelInvitations.modalInvitation, onDismiss: duelInvitations.modalDidDismiss) { invitation in
             DuelInvitationSheet(invitation: invitation)
                 .environment(duelInvitations)
         }
-        .onChange(of: duelInvitations.acceptedInvitation) { _, invitation in
-            guard let invitation else { return }
-            duelInvitations.acceptedInvitation = nil
-            lobby = DuelLobby(me: me, opponent: invitation.host, exercise: invitation.exercise, duration: invitation.duration, myStats: profileOverview.stats)
+        .onChange(of: duelInvitations.acceptedDuel) { _, accepted in
+            guard let accepted else { return }
+            duelInvitations.acceptedDuel = nil
+            lobby = DuelLobby(snapshot: accepted, me: me, myStats: localDuelStats)
+        }
+        .alert(
+            "Challenge",
+            isPresented: Binding(
+                get: { duelInvitations.errorMessage != nil },
+                set: { if !$0 { duelInvitations.errorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(duelInvitations.errorMessage ?? "")
+        }
+        .onChange(of: lobby == nil) { _, closed in
+            // A duel just ended (or was left): new totals, history and places.
+            if closed { Task { await statsStore.refresh() } }
         }
         .fullScreenCover(item: $lobby) { lobby in
             DuelLobbyFlow(lobby: lobby)
@@ -189,7 +218,7 @@ struct MainTabsView: View {
                 start: start,
                 me: me,
                 friends: profileOverview.friends,
-                myStats: profileOverview.stats,
+                myStats: localDuelStats,
                 onDuelAccepted: { lobbyAfterSheet = $0 },
                 onTrainingStart: { trainingAfterSheet = $0 },
                 friendsService: friendsStore.service,
@@ -197,19 +226,6 @@ struct MainTabsView: View {
             )
             .task { await friendsStore.refresh() }
         }
-    }
-
-    /// DEBUG `-debugIncomingDuel YES`: a mock friend invites me to a push-ups duel on launch.
-    private func receiveDebugInvitation() {
-        #if DEBUG
-        guard UserDefaults.standard.bool(forKey: "debugIncomingDuel") else { return }
-        duelInvitations.receive(DuelInvitation(
-            host: MockData.friends.first ?? PlayerProfile(nickname: "Nova_07", emoji: "🐧"),
-            exercise: .pushUps,
-            duration: .default,
-            expiresAt: .now.addingTimeInterval(DuelInvitation.defaultLifetime)
-        ))
-        #endif
     }
 
     @ViewBuilder
@@ -223,10 +239,14 @@ struct MainTabsView: View {
                 onChallenge: { activityFlow = .chooseExercise(.duel) },
                 onOpenRating: { selectedTab = .rating }
             )
+            .task { await statsStore.refresh() }
         case .rating:
-            RatingView(me: me, overview: showsFilledData ? MockData.ratingFilled(me: me) : .empty)
+            RatingView(me: me, overview: showsFilledData ? MockData.ratingFilled(me: me) : statsStore.rating)
+                .task { await statsStore.refresh() }
+                .refreshable { await statsStore.refresh() }
         case .profile:
             ProfileView(me: me, overview: profileOverview)
+                .task { await statsStore.refresh() }
         }
     }
 }

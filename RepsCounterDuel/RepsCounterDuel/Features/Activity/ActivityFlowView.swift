@@ -1,4 +1,5 @@
 import SwiftUI
+import OSLog
 import Backend
 import DesignSystem
 import ExerciseAnalyzer
@@ -43,18 +44,21 @@ struct ActivityFlowView: View {
     var friendsService: any FriendsServicing = AppServices.friendsService
     /// My friends changed here (request sent / accepted from a player card).
     var onFriendsChanged: () -> Void = {}
+    var duelService: any DuelServicing = AppServices.duelService
 
     private enum Route: Hashable {
         case chooseExercise(ActivityMode)
         case chooseFriend(Exercise)
         case duelTime(Exercise, FriendListItem)
-        case challengeSent(Exercise, FriendListItem, DuelDuration)
+        case waiting(DuelSnapshot)
         case player(PlayerCard)
         case playerFriends(PlayerCard)
     }
 
     @State private var path: [Route] = []
     @State private var isAddFriendPresented = false
+    @State private var isCreatingDuel = false
+    @State private var duelError: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -78,11 +82,12 @@ struct ActivityFlowView: View {
                         DuelTimeView(
                             onBack: { path.removeLast() },
                             onClose: { dismiss() },
-                            onSend: { path.append(.challengeSent(exercise, friend, $0)) }
+                            onSend: { createDuel(friend: friend.profile, exercise: exercise, duration: $0) }
                         )
-                    case .challengeSent(let exercise, let friend, let duration):
-                        DuelWaitingView(friend: friend.profile, onCancel: { dismiss() }, onAccepted: {
-                            onDuelAccepted(DuelLobby(me: me, opponent: friend.profile, exercise: exercise, duration: duration, myStats: myStats))
+                        .disabled(isCreatingDuel)
+                    case .waiting(let duel):
+                        DuelWaitingView(duel: duel, service: duelService, onCancel: { dismiss() }, onAccepted: { accepted in
+                            onDuelAccepted(DuelLobby(snapshot: accepted, me: me, myStats: myStats))
                             dismiss()
                         })
                     case .player(let card):
@@ -106,10 +111,36 @@ struct ActivityFlowView: View {
                     }
                 }
         }
+        .alert("Challenge not sent", isPresented: Binding(get: { duelError != nil }, set: { if !$0 { duelError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(duelError ?? "")
+        }
         .sheet(isPresented: $isAddFriendPresented) {
             AddFriendSheet(service: friendsService, myNickname: me.nickname) { card in
                 isAddFriendPresented = false
                 path.append(.player(card))
+            }
+        }
+    }
+
+    /// Send Challenge: the server creates the invitation, then Waiting... follows it.
+    private func createDuel(friend: PlayerProfile, exercise: Exercise, duration: DuelDuration) {
+        guard !isCreatingDuel else { return }
+        isCreatingDuel = true
+        Task {
+            defer { isCreatingDuel = false }
+            do {
+                path.append(.waiting(try await duelService.create(friend: friend, exercise: exercise, duration: duration)))
+            } catch {
+                AppLog.backend.error("Creating a duel failed: \(String(describing: error), privacy: .public)")
+                // PROVISIONAL copy (no Figma frames).
+                duelError = switch error as? DuelServiceError {
+                case .busy: "You or \(friend.nickname) are already in a duel."
+                case .notFriends: "You can challenge only your friends."
+                case .rateLimited: "Too many challenges. Try again later."
+                default: "Couldn't send the challenge. Check your internet connection and try again."
+                }
             }
         }
     }

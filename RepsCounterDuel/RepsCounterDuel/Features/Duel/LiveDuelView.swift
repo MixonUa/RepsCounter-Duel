@@ -8,23 +8,42 @@ import ExerciseAnalyzer
 ///   round "GET READY" counter in the middle, bottom panel "GET IN FRAME".
 /// - Live: top bar with both scores and the time left, the green/red score bar; bottom panel
 ///   "YOUR REPS", "<opponent> is on N" and Give up.
-/// My reps are counted on the device (Vision + `RepCounter`) with the skeleton and tracking hints
-/// over the camera; the opponent's reps are mock until stage 4. DEBUG: tapping the big number adds
-/// one of my reps. Stage 4 takes the start/end times from the
-/// server instead of the device clock.
+/// Server-timed (CLAUDE.md §6): the countdown runs to the server's `starts_at`, scoring is open
+/// until `ends_at` (both converted to this device's clock). My reps are counted on the device
+/// (Vision + `RepCounter`) and each one is sent to the server in order; the server decides which
+/// count. The opponent's score comes from polling the duel every second. After the end (+ grace)
+/// the duel is finalized on the server and the result uses the server's counts.
+/// DEBUG: tapping the big number adds one of my reps (Simulator has no camera).
 struct LiveDuelView: View {
     let lobby: DuelLobby
-    /// The time ran out (results / finalizing come next).
+    /// The server snapshot with `startsAt` / `endsAt`.
+    let start: DuelSnapshot
+    let service: any DuelServicing
+    /// Finalized by the server: accepted reps of both players.
     let onFinish: (_ myReps: Int, _ opponentReps: Int) -> Void
-    /// Give up was confirmed (forfeit).
+    /// Give up was confirmed (forfeit), or the opponent left.
     let onGiveUp: () -> Void
 
     @State private var phase: LiveDuelPhase = .countdown(3)
     @State private var tracker: WorkoutTracker
     @State private var opponentReps = 0
+    /// Reps the server has accepted for me.
+    @State private var serverReps = 0
+    /// Local reps already sent (accepted or rejected).
+    @State private var handledReps = 0
+    @State private var isSendingReps = false
+    @State private var didOpponentLeave = false
 
-    init(lobby: DuelLobby, onFinish: @escaping (_ myReps: Int, _ opponentReps: Int) -> Void, onGiveUp: @escaping () -> Void) {
+    init(
+        lobby: DuelLobby,
+        start: DuelSnapshot,
+        service: any DuelServicing,
+        onFinish: @escaping (_ myReps: Int, _ opponentReps: Int) -> Void,
+        onGiveUp: @escaping () -> Void
+    ) {
         self.lobby = lobby
+        self.start = start
+        self.service = service
         self.onFinish = onFinish
         self.onGiveUp = onGiveUp
         _tracker = State(initialValue: WorkoutTracker(exercise: lobby.exercise))
@@ -63,13 +82,20 @@ struct LiveDuelView: View {
         .persistentSystemOverlays(.hidden)
         .animation(.snappy, value: phase)
         .task { await run() }
+        .onChange(of: tracker.reps) { Task { await sendPendingReps() } }
+        .alert("Duel over", isPresented: $didOpponentLeave) {
+            Button("Close", action: onGiveUp)
+        } message: {
+            // PROVISIONAL copy (no Figma frame): forfeit = no rating reps for anyone.
+            Text("\(lobby.opponent.nickname) left the duel. No reps are added to the rating.")
+        }
         .onAppear { tracker.start() }
         .onDisappear { tracker.stop() }
         .sensoryFeedback(.increase, trigger: myReps)
         .animation(.snappy, value: tracker.feedback)
         .sensoryFeedback(.impact(weight: .heavy), trigger: phase)
         .confirmationDialog("Give up the duel?", isPresented: $isGiveUpConfirmationPresented, titleVisibility: .visible) {
-            Button("Give up", role: .destructive, action: onGiveUp)
+            Button("Give up", role: .destructive, action: giveUp)
             Button("Keep going", role: .cancel) {}
         } message: {
             // PROVISIONAL copy; CLAUDE.md §6: leaving during live = forfeit, no rating reps.
@@ -141,25 +167,82 @@ struct LiveDuelView: View {
     // MARK: - Timeline
 
     private func run() async {
-        for value in stride(from: 3, through: 1, by: -1) {
-            phase = .countdown(value)
-            try? await Task.sleep(for: .seconds(1))
-            if Task.isCancelled { return }
+        guard let startsAt = start.startsAt, let endsAt = start.endsAt else { return }
+        // Countdown to the server start: 3 · 2 · 1.
+        while Date.now < startsAt, !Task.isCancelled {
+            let left = Int(startsAt.timeIntervalSinceNow.rounded(.up))
+            phase = .countdown(min(3, max(1, left)))
+            try? await Task.sleep(for: .milliseconds(200))
         }
-        let endsAt = Date.now.addingTimeInterval(TimeInterval(lobby.duration.seconds))
+        if Task.isCancelled { return }
         phase = .live(endsAt: endsAt)
-        // Only full cycles inside the duel window score (device clock; server window in stage 4).
-        tracker.startScoring(duration: TimeInterval(lobby.duration.seconds))
+        // Only full cycles inside the server window score on the device too.
+        tracker.startScoring(duration: max(0, endsAt.timeIntervalSinceNow))
 
-        // UI stage: the opponent's reps arrive every few seconds (mock realtime).
-        while Date.now < endsAt {
-            try? await Task.sleep(for: .seconds(Double.random(in: 2.5...5)))
-            if Task.isCancelled { return }
-            if Date.now < endsAt { opponentReps += 1 }
+        while Date.now < endsAt, !Task.isCancelled, !didOpponentLeave {
+            await poll()
+            try? await Task.sleep(for: .seconds(1))
         }
+        if Task.isCancelled || didOpponentLeave { return }
         phase = .finished
         tracker.stopScoring()
-        onFinish(myReps, opponentReps)
+        await sendPendingReps()
+        await finalize()
+    }
+
+    /// Opponent's score (and a forfeit) from the server.
+    private func poll() async {
+        guard let snapshot = try? await service.view(start.id) else { return }
+        opponentReps = snapshot.opponentReps
+        serverReps = max(serverReps, snapshot.myReps)
+        if snapshot.phase == .forfeited || snapshot.phase == .cancelled, !snapshot.forfeitedByMe {
+            tracker.stopScoring()
+            didOpponentLeave = true
+        }
+    }
+
+    /// Sends my new local reps one by one as "accepted so far + 1"; a rep the server rejects
+    /// (too fast, out of the window) is dropped, a network error is retried.
+    private func sendPendingReps() async {
+        guard !isSendingReps else { return }
+        isSendingReps = true
+        defer { isSendingReps = false }
+        var failures = 0
+        while handledReps < tracker.reps, failures < 5 {
+            do {
+                let snapshot = try await service.submitRep(start.id, sequence: serverReps + 1)
+                serverReps = snapshot.myReps
+                opponentReps = snapshot.opponentReps
+                handledReps += 1
+                failures = 0
+            } catch {
+                failures += 1
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+    }
+
+    /// After the end + the server's 2 s grace, finalize (idempotent, retried) and report.
+    private func finalize() async {
+        guard let endsAt = start.endsAt else { return }
+        let finalizeAt = endsAt.addingTimeInterval(2.5)
+        if Date.now < finalizeAt { try? await Task.sleep(for: .seconds(finalizeAt.timeIntervalSinceNow)) }
+        for attempt in 0..<10 {
+            if let snapshot = try? await service.finish(start.id), snapshot.phase == .completed {
+                onFinish(snapshot.myReps, snapshot.opponentReps)
+                return
+            }
+            try? await Task.sleep(for: .seconds(attempt < 3 ? 1 : 3))
+        }
+        // PROVISIONAL: could not confirm with the server — show the last known numbers.
+        onFinish(serverReps, opponentReps)
+    }
+
+    private func giveUp() {
+        let id = start.id
+        tracker.stopScoring()
+        Task { _ = try? await service.leave(id) }
+        onGiveUp()
     }
 
     private func debugAddRep() {
@@ -299,14 +382,22 @@ extension DuelDuration {
 }
 
 #Preview {
+    let lobby = DuelLobby(
+        me: PlayerProfile(nickname: "Sophie", emoji: "🐧"),
+        opponent: PlayerProfile(nickname: "Lena_v", emoji: "🐱"),
+        exercise: .pushUps,
+        duration: .default,
+        myStats: .empty
+    )
     LiveDuelView(
-        lobby: DuelLobby(
-            me: PlayerProfile(nickname: "Sophie", emoji: "🐧"),
-            opponent: PlayerProfile(nickname: "Lena_v", emoji: "🐱"),
-            exercise: .pushUps,
-            duration: .default,
-            myStats: .empty
+        lobby: lobby,
+        start: DuelSnapshot(
+            id: lobby.id, phase: .countdown, role: .host, opponent: lobby.opponent, exercise: .pushUps,
+            duration: .default, expiresAt: .now, myReady: true, opponentReady: true,
+            startsAt: .now.addingTimeInterval(4), endsAt: .now.addingTimeInterval(64),
+            myReps: 0, opponentReps: 0, forfeitedByMe: false
         ),
+        service: MockDuelService(),
         onFinish: { _, _ in },
         onGiveUp: {}
     )
