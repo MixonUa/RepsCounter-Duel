@@ -51,6 +51,9 @@ struct LiveDuelView: View {
         self.onFinish = onFinish
         self.onGiveUp = onGiveUp
         _tracker = State(initialValue: WorkoutTracker(exercise: lobby.exercise))
+        // Resumed duel: continue from what the server already accepted.
+        _serverReps = State(initialValue: start.myReps)
+        _opponentReps = State(initialValue: start.opponentReps)
     }
 
     private var myReps: Int { tracker.reps }

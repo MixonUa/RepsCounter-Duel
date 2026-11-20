@@ -98,6 +98,9 @@ public protocol DuelServicing: Sendable {
     func leave(_ duel: UUID) async throws -> DuelSnapshot
     /// "I'm still here" (lobby / countdown / live, about every second); returns the duel view.
     func heartbeat(_ duel: UUID) async throws -> DuelSnapshot
+    /// My unfinished duel (host waiting, lobby, countdown, live, ended but not finalized), if any —
+    /// for Resume / Leave after the app was closed mid-flow.
+    func activeDuel() async throws -> DuelSnapshot?
     /// Real stats of both players for the lobby; nil when the duel is not mine.
     func headToHead(_ duel: UUID, exercise: Exercise) async throws -> DuelHeadToHead?
 }

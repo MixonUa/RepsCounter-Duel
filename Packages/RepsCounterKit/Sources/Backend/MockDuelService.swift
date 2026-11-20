@@ -116,6 +116,13 @@ public actor MockDuelService: DuelServicing {
         return snapshot(duel)
     }
 
+    public func activeDuel() async throws -> DuelSnapshot? {
+        duels.values
+            .filter { [.lobby, .countdown, .live, .finishing].contains(phase($0)) || ($0.role == .host && phase($0) == .invited) }
+            .max { $0.createdAt < $1.createdAt }
+            .map(snapshot)
+    }
+
     public func heartbeat(_ id: UUID) async throws -> DuelSnapshot {
         guard let snapshot = try await view(id) else { throw DuelServiceError.noLongerAvailable }
         return snapshot

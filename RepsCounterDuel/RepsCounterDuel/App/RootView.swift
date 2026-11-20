@@ -28,6 +28,10 @@ struct MainTabsView: View {
     @State private var lobby: DuelLobby?
     /// Host side: the lobby opens once the activity sheet has finished closing.
     @State private var lobbyAfterSheet: DuelLobby?
+    /// Server snapshot when the lobby cover resumes an unfinished duel.
+    @State private var resumedDuel: DuelSnapshot?
+    /// Unfinished duel found on launch: Resume / Leave.
+    @State private var unfinishedDuel: DuelSnapshot?
     /// Full-screen training for the chosen exercise (opens once the activity sheet has closed).
     @State private var training: Exercise?
     @State private var trainingAfterSheet: Exercise?
@@ -153,6 +157,7 @@ struct MainTabsView: View {
             guard scenePhase == .active else { return }
             friendRequests.onFriendsChanged = { [friendsStore] in Task { await friendsStore.refresh() } }
             await friendsStore.refresh()
+            await checkUnfinishedDuel()
             await trainingStore.syncRecords()
             await statsStore.refresh()
             async let requests: Void = friendRequests.keepUpdated()
@@ -183,8 +188,15 @@ struct MainTabsView: View {
             // A duel just ended (or was left): new totals, history and places.
             if closed { Task { await statsStore.refresh() } }
         }
-        .fullScreenCover(item: $lobby) { lobby in
-            DuelLobbyFlow(lobby: lobby)
+        .fullScreenCover(item: $lobby, onDismiss: { resumedDuel = nil }) { lobby in
+            DuelLobbyFlow(lobby: lobby, resume: resumedDuel)
+        }
+        // PROVISIONAL (no Figma frame): an unfinished duel after the app was closed.
+        .alert("Unfinished duel", isPresented: Binding(get: { unfinishedDuel != nil }, set: { if !$0 { unfinishedDuel = nil } }), presenting: unfinishedDuel) { duel in
+            Button("Resume") { resume(duel) }
+            Button("Leave", role: .destructive) { leave(duel) }
+        } message: { duel in
+            Text(Self.unfinishedMessage(duel))
         }
         .fullScreenCover(item: $training) { exercise in
             TrainingFlow(me: me, exercise: exercise, rank: homeOverview.rank, store: trainingStore)
@@ -225,6 +237,35 @@ struct MainTabsView: View {
                 onFriendsChanged: { Task { await friendsStore.refresh() } }
             )
             .task { await friendsStore.refresh() }
+        }
+    }
+
+    /// After a relaunch the app may have left a duel on the server (waiting, lobby, live): it keeps
+    /// blocking new challenges ("busy") until it expires, so offer Resume or Leave.
+    private func checkUnfinishedDuel() async {
+        guard lobby == nil, activityFlow == nil, unfinishedDuel == nil,
+              let duel = try? await AppServices.duelService.activeDuel() else { return }
+        unfinishedDuel = duel
+    }
+
+    private func resume(_ duel: DuelSnapshot) {
+        resumedDuel = duel
+        lobby = DuelLobby(snapshot: duel, me: me, myStats: localDuelStats)
+    }
+
+    private func leave(_ duel: DuelSnapshot) {
+        Task {
+            _ = try? await AppServices.duelService.leave(duel.id)
+            await statsStore.refresh()
+        }
+    }
+
+    private static func unfinishedMessage(_ duel: DuelSnapshot) -> String {
+        let name = duel.opponent.nickname
+        switch duel.phase {
+        case .invited: return "Your challenge to \(name) is still waiting for an answer."
+        case .lobby: return "Your duel with \(name) is waiting in the lobby."
+        default: return "Your duel with \(name) is still running. Leaving now counts as giving up."
         }
     }
 

@@ -64,6 +64,14 @@ public struct SupabaseDuelService: DuelServicing {
         try await snapshot("leave_duel", ["duel": duel])
     }
 
+    public func activeDuel() async throws -> DuelSnapshot? {
+        try await backend.ensureSession()
+        let row: DuelRow? = try await mapErrors {
+            try await backend.client.rpc("my_active_duel").execute().value
+        }
+        return try row?.snapshot()
+    }
+
     public func heartbeat(_ duel: UUID) async throws -> DuelSnapshot {
         try await snapshot("duel_heartbeat", ["duel": duel])
     }

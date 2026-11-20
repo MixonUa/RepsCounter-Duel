@@ -285,6 +285,8 @@ struct LobbyBackButton: View {
 /// same friend with the same exercise and time: Waiting... → a fresh lobby once accepted).
 struct DuelLobbyFlow: View {
     let lobby: DuelLobby
+    /// Resuming an unfinished duel after relaunch: starts on Waiting..., the lobby or the duel.
+    var resume: DuelSnapshot?
     var service: any DuelServicing = AppServices.duelService
     @Environment(\.dismiss) private var dismiss
 
@@ -300,8 +302,17 @@ struct DuelLobbyFlow: View {
     /// Both players' real stats for the current duel (loaded once per duel, before it starts).
     @State private var headToHead: (duel: UUID, stats: DuelHeadToHead)?
 
+    private var initialStage: Stage {
+        guard let resume else { return .lobby(lobby) }
+        switch resume.phase {
+        case .invited: return .waiting(resume)
+        case .countdown, .live, .finishing: return .live(lobby, resume)
+        default: return .lobby(lobby)
+        }
+    }
+
     private var currentDuelID: UUID {
-        switch stage ?? .lobby(lobby) {
+        switch stage ?? initialStage {
         case .lobby(let l), .live(let l, _), .result(let l, _, _): l.id
         case .waiting(let duel): duel.id
         }
@@ -314,7 +325,7 @@ struct DuelLobbyFlow: View {
 
     var body: some View {
         Group {
-            switch stage ?? .lobby(lobby) {
+            switch stage ?? initialStage {
             case .lobby(let current):
                 DuelLobbyView(lobby: enriched(current), service: service, onLeave: { dismiss() }, onBothReady: { stage = .live(current, $0) })
             case .live(let current, let start):
@@ -350,7 +361,7 @@ struct DuelLobbyFlow: View {
     }
 
     private func loadHeadToHead() async {
-        guard case .lobby(let current) = stage ?? .lobby(lobby), headToHead?.duel != current.id else { return }
+        guard case .lobby(let current) = stage ?? initialStage, headToHead?.duel != current.id else { return }
         if let stats = try? await service.headToHead(current.id, exercise: current.exercise) {
             headToHead = (current.id, stats)
         }
