@@ -88,6 +88,20 @@ import Testing
         #expect(progress.gain(for: .squats, since: weekStart) == 3)
     }
 
+    @Test func olderSavesWithoutOldValueStillGiveTheLaterGrowth() throws {
+        // 8 saved today before the old value was stored, then 10 with the old value (8).
+        let json = #"{"totalReps":18,"records":["squats",10],"recordHistory":[{"exercise":"squats","reps":8,"date":1000060},{"exercise":"squats","reps":10,"date":1000120,"previous":8}]}"#
+        let progress = try JSONDecoder().decode(TrainingProgress.self, from: Data(json.utf8))
+        #expect(progress.gain(for: .squats, since: weekStart) == 2)
+    }
+
+    @Test func oldValueComesFromThePreviousEvent() throws {
+        // Both saved without the old value: 5 last week, 8 this week → +3.
+        let json = #"{"totalReps":13,"records":["squats",8],"recordHistory":[{"exercise":"squats","reps":5,"date":900000},{"exercise":"squats","reps":8,"date":1000060}]}"#
+        let progress = try JSONDecoder().decode(TrainingProgress.self, from: Data(json.utf8))
+        #expect(progress.gain(for: .squats, since: weekStart) == 3)
+    }
+
     @Test func unknownOldRecordShowsNoGain() throws {
         // A record event saved before `previous` existed: the old value is unknown.
         let json = #"{"totalReps":8,"records":["squats",8],"recordHistory":[{"exercise":"squats","reps":8,"date":1000060}]}"#

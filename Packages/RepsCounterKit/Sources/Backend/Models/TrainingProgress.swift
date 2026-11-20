@@ -44,10 +44,21 @@ public struct TrainingProgress: Codable, Hashable, Sendable {
     /// record is the one replaced by the first improvement since `weekStart` (was 5, now 8 → +3;
     /// 5 → 8 → 10 within the week → +5). 0 when the record wasn't improved this week or the old
     /// value is unknown (saves from before it was stored).
+    ///
+    /// An event saved without `previous` takes it from the record event before it; when that is
+    /// unknown too, the week's growth starts at the first event whose old value is known.
     public func gain(for exercise: Exercise, since weekStart: Date) -> Int {
-        let thisWeek = recordHistory.filter { $0.exercise == exercise && $0.date >= weekStart }
-        guard let first = thisWeek.first, let previous = first.previous else { return 0 }
-        return max(0, record(for: exercise) - previous)
+        let events = recordHistory.filter { $0.exercise == exercise }
+        var knownOldRecordThisWeek: Int?
+        for (index, event) in events.enumerated() where event.date >= weekStart {
+            let old = event.previous ?? (index > 0 ? events[index - 1].reps : nil)
+            if let old {
+                knownOldRecordThisWeek = old
+                break
+            }
+        }
+        guard let old = knownOldRecordThisWeek else { return 0 }
+        return max(0, record(for: exercise) - old)
     }
 
     /// Gains for every exercise with an improvement since `weekStart`.
