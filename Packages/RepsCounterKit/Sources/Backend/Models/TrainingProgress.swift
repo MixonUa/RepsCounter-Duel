@@ -6,11 +6,13 @@ import ExerciseAnalyzer
 /// `records` is the best single session per exercise (the training record). Every new record is
 /// also logged with its date, so Home can show "+N this week".
 public struct TrainingProgress: Codable, Hashable, Sendable {
-    /// A new record set at `date`.
+    /// A new record set at `date`, replacing `previous` (the old record; nil in saves from before
+    /// it was stored — then the improvement is unknown).
     public struct RecordEvent: Codable, Hashable, Sendable {
         public let exercise: Exercise
         public let reps: Int
         public let date: Date
+        public let previous: Int?
     }
 
     public private(set) var totalReps: Int
@@ -31,20 +33,21 @@ public struct TrainingProgress: Codable, Hashable, Sendable {
     public mutating func add(reps: Int, of exercise: Exercise, at date: Date = .now) -> Bool {
         let reps = max(0, reps)
         totalReps += reps
-        guard reps > record(for: exercise) else { return false }
+        let previous = record(for: exercise)
+        guard reps > previous else { return false }
         records[exercise] = reps
-        recordHistory.append(RecordEvent(exercise: exercise, reps: reps, date: date))
+        recordHistory.append(RecordEvent(exercise: exercise, reps: reps, date: date, previous: previous))
         return true
     }
 
-    /// How much the record grew since `weekStart` ("+4 this week"): the current record minus the
-    /// best known before that moment (0 when the first record was set this week). 0 when the record
-    /// wasn't improved this week, or for records saved before the history existed.
+    /// How much the record grew this week ("+3 this week"): new record − old record, where the old
+    /// record is the one replaced by the first improvement since `weekStart` (was 5, now 8 → +3;
+    /// 5 → 8 → 10 within the week → +5). 0 when the record wasn't improved this week or the old
+    /// value is unknown (saves from before it was stored).
     public func gain(for exercise: Exercise, since weekStart: Date) -> Int {
-        let events = recordHistory.filter { $0.exercise == exercise }
-        guard let latest = events.last, latest.date >= weekStart else { return 0 }
-        let before = events.filter { $0.date < weekStart }.map(\.reps).max() ?? 0
-        return max(0, record(for: exercise) - before)
+        let thisWeek = recordHistory.filter { $0.exercise == exercise && $0.date >= weekStart }
+        guard let first = thisWeek.first, let previous = first.previous else { return 0 }
+        return max(0, record(for: exercise) - previous)
     }
 
     /// Gains for every exercise with an improvement since `weekStart`.

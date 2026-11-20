@@ -81,6 +81,20 @@ import Testing
         #expect(progress.gains(since: weekStart) == [.squats: 4, .pushUps: 5])
     }
 
+    @Test func gainIsNewRecordMinusOldRecord() {
+        var progress = TrainingProgress()
+        progress.add(reps: 5, of: .squats, at: weekStart.addingTimeInterval(-86_400 * 10))
+        progress.add(reps: 8, of: .squats, at: weekStart.addingTimeInterval(60))
+        #expect(progress.gain(for: .squats, since: weekStart) == 3)
+    }
+
+    @Test func unknownOldRecordShowsNoGain() throws {
+        // A record event saved before `previous` existed: the old value is unknown.
+        let json = #"{"totalReps":8,"records":["squats",8],"recordHistory":[{"exercise":"squats","reps":8,"date":1000060}]}"#
+        let progress = try JSONDecoder().decode(TrainingProgress.self, from: Data(json.utf8))
+        #expect(progress.gain(for: .squats, since: weekStart) == 0)
+    }
+
     @Test func noGainWithoutAnImprovementThisWeek() {
         var progress = TrainingProgress()
         progress.add(reps: 10, of: .squats, at: weekStart.addingTimeInterval(-86_400))
